@@ -180,6 +180,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--limit", type=int, default=None,
                     help="Ne traiter que les N premières questions (smoke test).")
+    ap.add_argument("--sample-per-cat", type=int,
+                    default=int(os.environ.get("SAMPLE_PER_CAT", "0")) or None,
+                    help="Échantillon stratifié : au plus N questions par catégorie "
+                         "(tirage déterministe via SEED). Défaut $SAMPLE_PER_CAT ou tout.")
     ap.add_argument("--models", default=None,
                     help="Liste de modèles (défaut : $MODELS).")
     ap.add_argument("--host", default=os.environ.get("LMSTUDIO_HOST", "http://localhost:1234"))
@@ -199,6 +203,15 @@ def main() -> None:
     print(f"prompts  : {[p['id'] for p in prompts]}")
 
     questions = pl.read_parquet(SILVER_QUESTIONS)
+    n_full = len(questions)
+    if args.sample_per_cat:
+        questions = (
+            questions.sort("question_id")           # ordre stable avant tirage
+            .group_by("category", maintain_order=True)
+            .map_groups(lambda g: g.sample(min(len(g), args.sample_per_cat), seed=seed))
+        )
+        print(f"échantillon stratifié : {len(questions)}/{n_full} questions "
+              f"(<= {args.sample_per_cat}/catégorie, seed={seed})")
     if args.limit:
         questions = questions.head(args.limit)
     q_records = questions.to_dicts()

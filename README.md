@@ -188,6 +188,8 @@ Le réseau EFREI passe par un proxy **Cato Networks** qui (a) inspecte le TLS et
 - [ ] Liste finale des modèles (`.env`) et quantizations.
 - [ ] Prompts actifs (`config/prompts.yaml`) — arbitrer budget temps vs finesse d'analyse.
 - [ ] Méthode `ai_correct` de référence + spot-check chiffré à mettre dans le rapport.
-- [ ] Seed / dataset complet ou échantillon stratifié si le temps manque.
+- [ ] Dataset complet (~5248 q) ou **échantillon stratifié** (`SAMPLE_PER_CAT`
+      dans `.env`, ou `--sample-per-cat N`) : N=75 → ~1680 q, ~70/catégorie,
+      distribution difficulté/type préservée, run ~2-3 h. Choix à assumer dans le rapport.
 - [ ] `dim_model` : ajouter un seed `seeds/model_meta.csv` (params, quantization, famille).
 - [ ] Rédaction du rapport d'analyse (page Streamlit dédiée ou section README).

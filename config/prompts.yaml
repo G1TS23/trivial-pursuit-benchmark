@@ -1,0 +1,56 @@
+# Variantes de prompt versionnées.
+# Chaque question du benchmark est posée avec CHAQUE prompt actif (active: true),
+# pour tous les modèles. Le prompt_id et le texte complet sont tracés dans la donnée
+# silver (colonnes prompt_id / prompt_text) => benchmark rigoureux et rejouable.
+#
+# Placeholders disponibles dans `template` :
+#   {question}        texte de la question
+#   {options_block}   liste "A) ...\nB) ..." (uniquement type=multiple)
+#   {letters}         ex. "A, B, C, D"
+#
+# `mode` :
+#   mcq_letter   -> le modèle doit répondre par une lettre ; on attend une sortie
+#                   structurée (enum de lettres). Matching = égalité stricte.
+#   open         -> réponse libre ; matching = normalisation + fuzzy (rapidfuzz).
+
+prompts:
+  - id: p1_naif
+    active: true
+    mode: open
+    description: "Prompt minimal, aucune contrainte de format (baseline)."
+    template: |
+      {question}
+
+  - id: p2_format
+    active: true
+    mode: mcq_letter
+    description: "QCM : options fournies, réponse contrainte à une seule lettre."
+    template: |
+      Question : {question}
+      Réponses possibles :
+      {options_block}
+      Réponds uniquement par la lettre ({letters}) de la bonne réponse.
+
+  - id: p3_role_format
+    active: true
+    mode: mcq_letter
+    description: "Ajoute un rôle d'expert + interdiction d'explication."
+    template: |
+      Tu es un expert en culture générale qui participe à un quiz.
+      Tu réponds toujours par une seule lettre, sans explication ni ponctuation.
+      Question : {question}
+      Réponses possibles :
+      {options_block}
+      Ta réponse (une lettre parmi {letters}) :
+
+  # Variante "réponse ouverte mais cadrée" : sert l'axe d'analyse
+  # "connaissance (open) vs reconnaissance (QCM)". Désactivée par défaut
+  # pour ne pas exploser le budget temps ; activer si le planning le permet.
+  - id: p4_open_court
+    active: false
+    mode: open
+    description: "Réponse ouverte, sans options, format court imposé."
+    template: |
+      Réponds uniquement par le nom propre ou l'expression exacte attendue,
+      sans phrase ni ponctuation.
+      Question : {question}

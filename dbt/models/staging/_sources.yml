@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: silver
+    description: "Couche silver (Parquet) produite par src/clean_silver.py et src/enrich_lmstudio.py."
+    meta:
+      external_location: "read_parquet('{{ var('silver_dir') }}/{name}/**/*.parquet', union_by_name = true)"
+    tables:
+      - name: questions
+        description: "Questions nettoyées + QCM déterministe (1 ligne / question)."
+        columns:
+          - name: question_id
+            tests: [not_null, unique]
+      - name: responses
+        description: "Réponses brutes des modèles (1 ligne / question x modèle x prompt)."
+        columns:
+          - name: question_id
+            tests: [not_null]

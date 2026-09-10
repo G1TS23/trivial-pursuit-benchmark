@@ -1,0 +1,12 @@
+# Profil local (pas de secret). Utilisé via `DBT_PROFILES_DIR=dbt` (voir Makefile).
+trivial_pursuit:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      # Fichier gold construit par dbt, lu ensuite EN LECTURE SEULE par Streamlit.
+      path: "{{ env_var('DBT_GOLD_DB', '../data/gold/gold.duckdb') }}"
+      threads: 4
+      extensions:
+        - httpfs
+        - parquet

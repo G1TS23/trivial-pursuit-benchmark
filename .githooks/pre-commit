@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Hook pre-commit partagé (versionné). Activé par :  git config core.hooksPath .githooks
+# (fait automatiquement par `make install` / `make hooks`).
+set -u
+
+fail=0
+say()  { printf '  \033[31m✗\033[0m %s\n' "$1"; fail=1; }
+ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; }
+
+# Fichiers ajoutés/modifiés dans l'index (pas les suppressions)
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+echo "pre-commit :"
+
+# 1. Ne jamais committer le data lake ni les secrets
+while IFS= read -r f; do
+  case "$f" in
+    data/*/*)
+      [ "$(basename "$f")" != ".gitkeep" ] && say "fichier du data lake stagé : $f" ;;
+    .env|*/.env)
+      say "secret stagé : $f" ;;
+    dbt/target/*|dbt/dbt_packages/*|dbt/logs/*|*.duckdb|*.parquet)
+      say "artefact généré stagé : $f" ;;
+  esac
+done <<< "$staged"
+
+# 2. Gros fichiers (> 5 Mo) — les données doivent rester hors git
+while IFS= read -r f; do
+  [ -f "$f" ] || continue
+  size=$(wc -c < "$f" | tr -d ' ')
+  [ "$size" -gt 5242880 ] && say "fichier > 5 Mo : $f ($((size / 1048576)) Mo)"
+done <<< "$staged"
+
+# 3. Marqueurs de conflit de merge
+if git diff --cached --check | grep -q .; then
+  say "espaces en fin de ligne ou marqueurs de conflit détectés (git diff --check)"
+fi
+
+# 4. Compilation des fichiers Python stagés
+py=$(echo "$staged" | grep -E '\.py$' || true)
+if [ -n "$py" ]; then
+  PYBIN=$([ -x .venv/bin/python ] && echo .venv/bin/python || command -v python3.13 || command -v python3)
+  if "$PYBIN" -m py_compile $py 2>/tmp/pc_err; then
+    ok "py_compile ($(echo "$py" | wc -l | tr -d ' ') fichiers)"
+  else
+    say "py_compile a échoué :"; sed 's/^/    /' /tmp/pc_err
+  fi
+  # ruff si dispo (non bloquant absent)
+  RUFF=$([ -x .venv/bin/ruff ] && echo .venv/bin/ruff || command -v ruff || true)
+  if [ -n "$RUFF" ]; then
+    "$RUFF" check $py && ok "ruff" || say "ruff a signalé des erreurs"
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo
+  echo "commit refusé. Corrige, ou force avec : git commit --no-verify"
+  exit 1
+fi
+echo "  ok."
+exit 0

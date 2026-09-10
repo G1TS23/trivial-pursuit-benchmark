@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: fct_benchmark_results
+    description: "Table de faits : une ligne par réponse (question x modèle x prompt x run)."
+    columns:
+      - name: result_key
+        tests: [not_null, unique]
+      - name: question_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_question')
+              field: question_id
+      - name: model
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_model')
+              field: model
+      - name: ai_correct
+        tests: [not_null]
+      - name: difficulty
+        tests:
+          - accepted_values:
+              values: ["easy", "medium", "hard"]
+
+  - name: dim_question
+    columns:
+      - name: question_id
+        tests: [not_null, unique]
+
+  - name: dim_model
+    columns:
+      - name: model
+        tests: [not_null, unique]
+
+  - name: dim_prompt
+    columns:
+      - name: prompt_id
+        tests: [not_null, unique]
+
+  - name: agg_model_leaderboard
+    description: "Classement des modèles : précision, latence, débit."
+  - name: agg_accuracy_by_category
+  - name: agg_accuracy_by_difficulty
+  - name: agg_prompt_impact

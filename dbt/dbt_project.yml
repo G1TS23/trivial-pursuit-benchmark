@@ -1,0 +1,24 @@
+name: "trivial_pursuit"
+version: "1.0.0"
+config-version: 2
+
+profile: "trivial_pursuit"
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Emplacements du data lake, relatifs au dossier dbt/ (surchageables par env).
+  silver_dir: "{{ env_var('DBT_SILVER_DIR', '../data/silver') }}"
+
+models:
+  trivial_pursuit:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts

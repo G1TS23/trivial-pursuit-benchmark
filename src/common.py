@@ -55,6 +55,23 @@ def normalize_answer(text: str) -> str:
 
 
 # --- Lecture d'env ------------------------------------------------------
+def load_dotenv(path: Path | None = None) -> None:
+    """Charge ROOT/.env dans os.environ (les vraies variables d'env priment).
+
+    Mini-parseur sans dépendance : `CLE=valeur`, `#` = commentaire,
+    guillemets optionnels. Suffisant pour ce projet.
+    """
+    p = path or (ROOT / ".env")
+    if not p.exists():
+        return
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        os.environ.setdefault(key.strip(), val.strip().strip('"').strip("'"))
+
+
 def env(key: str, default: str | None = None) -> str | None:
     return os.environ.get(key, default)
 

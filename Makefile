@@ -34,8 +34,8 @@ scrape: ## Étape 1 : scraping OpenTDB -> data/bronze/questions_raw.csv
 clean-silver: ## Étape 2a : nettoyage -> data/silver/questions/
 	$(PY) src/clean_silver.py
 
-enrich: ## Étape 2b : réponses des modèles LM Studio -> data/silver/responses/
-	set -a; [ -f .env ] && . ./.env; set +a; $(PY) src/enrich_lmstudio.py
+enrich: ## Étape 2b : réponses des modèles LM Studio -> data/silver/responses/  (ARGS="--limit 20" pour un test)
+	$(PY) src/enrich_lmstudio.py $(ARGS)
 
 build: ## Étape 3a : construction de la couche gold avec dbt
 	cd dbt && $(abspath $(DBT)) build

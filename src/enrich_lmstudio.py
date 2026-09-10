@@ -23,6 +23,7 @@ téléchargés (`lms get ...`). Voir README.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import string
@@ -39,9 +40,12 @@ from common import (
     SILVER_QUESTIONS,
     SILVER_RESPONSES_DIR,
     ensure_dirs,
+    load_dotenv,
     models_from_env,
     normalize_answer,
 )
+
+load_dotenv()   # rend .env disponible même quand le script est lancé directement
 
 LETTERS = string.ascii_uppercase
 FUZZY_THRESHOLD = 88          # >= => considéré correct en mode "open"
@@ -116,15 +120,26 @@ def render_prompt(tpl: str, q: dict) -> str:
 LETTER_RE = re.compile(r"\b([A-H])\b")
 
 
+def _extract_letter(raw: str) -> str | None:
+    """Lettre choisie : d'abord le JSON {"answer": "X"} (sortie structurée),
+    sinon la 1re lettre isolée A-H du texte."""
+    try:
+        val = json.loads(raw).get("answer", "")
+        if isinstance(val, str) and val.strip().upper()[:1] in LETTERS:
+            return val.strip().upper()[0]
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        pass
+    m = LETTER_RE.search(raw.upper())
+    return m.group(1) if m else None
+
+
 def grade(mode: str, raw: str, q: dict) -> tuple[bool, str, bool, str]:
     """-> (ai_correct, ai_answer_normalisee, is_parsable, match_method)"""
     if mode == "mcq_letter":
-        m = LETTER_RE.search(raw.upper())
-        if not m:
+        letter = _extract_letter(raw)
+        if letter is None or LETTERS.index(letter) >= len(q["options"]):
             return False, raw, False, "letter_exact"
-        letter = m.group(1)
-        idx = LETTERS.index(letter)
-        picked = q["options"][idx] if idx < len(q["options"]) else raw
+        picked = q["options"][LETTERS.index(letter)]
         return letter == q["correct_letter"], picked, True, "letter_exact"
 
     # mode "open" : normalisation + fuzzy + inclusion
@@ -139,21 +154,14 @@ def grade(mode: str, raw: str, q: dict) -> tuple[bool, str, bool, str]:
 
 
 def schema_for(mode: str, n_options: int) -> dict | None:
+    """Schéma JSON nu attendu par le SDK lmstudio (pas d'enveloppe OpenAI
+    `{"type":"json_schema", ...}` : le moteur la refuse en 400)."""
     if mode != "mcq_letter":
         return None
     return {
-        "type": "json_schema",
-        "json_schema": {
-            "name": "quiz_answer",
-            "strict": True,
-            "schema": {
-                "type": "object",
-                "properties": {"answer": {"type": "string",
-                                          "enum": list(LETTERS[:n_options])}},
-                "required": ["answer"],
-                "additionalProperties": False,
-            },
-        },
+        "type": "object",
+        "properties": {"answer": {"type": "string", "enum": list(LETTERS[:n_options])}},
+        "required": ["answer"],
     }
 
 

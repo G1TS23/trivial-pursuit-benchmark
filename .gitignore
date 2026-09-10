@@ -11,6 +11,12 @@ data/gold/*
 !data/bronze/.gitkeep
 !data/silver/.gitkeep
 !data/gold/.gitkeep
+# Exception : la source OpenTDB est bloquée sur le réseau EFREI (proxy Cato).
+# On versionne le CSV bronze une fois scrapé ailleurs, pour ne plus dépendre du réseau.
+!data/bronze/questions_raw.csv
+
+# --- Certificats CA d'entreprise (réseau à inspection TLS), spécifiques au poste ---
+certs/
 
 # --- dbt ---
 dbt/target/

@@ -1,5 +1,6 @@
 # Ingestion / traitement
 requests>=2.32
+truststore>=0.9        # utilise le magasin CA de l'OS (réseaux à inspection TLS)
 polars>=1.9
 pyarrow>=17
 pyyaml>=6.0

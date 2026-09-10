@@ -151,6 +151,32 @@ LM Studio expose aussi une API **OpenAI-compatible** sur
 `src/enrich_lmstudio.py` par un client `openai` (`base_url=...`, `api_key="lm-studio"`)
 et lire `response_time` au wall-clock.
 
+### Dépannage réseau (proxy EFREI / Cato)
+
+Le réseau EFREI passe par un proxy **Cato Networks** qui (a) inspecte le TLS et
+(b) **bloque `opentdb.com`** (catégorie « Games ») — HTTP 403 avec une page
+« Corporate Internet policy violation ».
+
+- **Inspection TLS** (`CERTIFICATE_VERIFY_FAILED`, « Cato Networks Root CA ») :
+  `truststore` (dans `requirements.txt`) fait utiliser le magasin de l'OS — il
+  suffit d'installer « Cato Networks Root CA » comme approuvé dans Trousseau
+  d'accès (Accès au trousseau → Système). Sinon, bundle CA maison :
+  ```bash
+  mkdir -p certs
+  # récupère le dernier certificat de la chaîne (la racine Cato) :
+  openssl s_client -showcerts -connect opentdb.com:443 -servername opentdb.com </dev/null 2>/dev/null \
+    | awk '/BEGIN CERTIFICATE/{i++} i{print > "certs/c" i ".pem"}'
+  cat "$(.venv/bin/python -c 'import certifi;print(certifi.where())')" certs/c3.pem > certs/ca-bundle.pem
+  export REQUESTS_CA_BUNDLE="$PWD/certs/ca-bundle.pem"   # requests le lit automatiquement
+  ```
+  `certs/` est gitignoré (spécifique au poste). En dernier recours :
+  `python src/scrape_opentdb.py --insecure`.
+- **Blocage du domaine** : le code ne peut rien y faire. Lancer `make scrape`
+  depuis un **réseau non filtré** (partage de connexion mobile, réseau perso, ou
+  Cato Client en pause s'il est installé sur le poste), puis **committer
+  `data/bronze/questions_raw.csv`** (exception ajoutée au `.gitignore`) pour ne
+  plus dépendre du réseau ensuite. Les étapes 2 et 3 sont 100 % locales.
+
 ## 4. Livrables
 
 1. Architecture de projet complète — ce dépôt.

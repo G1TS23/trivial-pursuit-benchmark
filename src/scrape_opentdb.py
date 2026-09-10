@@ -19,6 +19,7 @@ import argparse
 import base64
 import csv
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -26,6 +27,15 @@ from datetime import datetime, timezone
 import requests
 
 from common import BRONZE_CSV, ensure_dirs, question_id
+
+# Réseaux à inspection TLS (proxy d'entreprise/école) : utiliser le magasin de
+# certificats de l'OS si `truststore` est installé. Sans effet ailleurs.
+try:  # pragma: no cover
+    import truststore
+
+    truststore.inject_into_ssl()
+except Exception:  # noqa: BLE001
+    pass
 
 API = "https://opentdb.com"
 REQUEST_PAUSE = 5.0          # respect strict du rate limit
@@ -42,22 +52,44 @@ def _b64(s: str) -> str:
     return base64.b64decode(s).decode("utf-8")
 
 
+class BlockedError(RuntimeError):
+    """Le réseau (proxy/filtrage) refuse l'accès à OpenTDB."""
+
+
+def _json(r: requests.Response) -> dict:
+    """r.json() avec un message clair si le proxy renvoie une page de blocage."""
+    body_lower = r.text.lower()
+    if "cato" in body_lower or "policy violation" in body_lower:
+        raise BlockedError(
+            "OpenTDB est bloqué par le proxy réseau (Cato Networks / filtrage "
+            "'Games'). Rien à corriger dans le code : lance le scraping depuis "
+            "un réseau non filtré (partage de connexion mobile, réseau perso, "
+            "Cato Client en pause) ou fais débloquer opentdb.com.\n"
+            f"  HTTP {r.status_code} — {r.text[:200].replace(chr(10), ' ')}"
+        )
+    r.raise_for_status()
+    ctype = r.headers.get("content-type", "")
+    if "application/json" not in ctype:
+        raise BlockedError(
+            f"réponse non-JSON (HTTP {r.status_code}, {ctype}) : "
+            f"{r.text[:200].replace(chr(10), ' ')}"
+        )
+    return r.json()
+
+
 def get_token(session: requests.Session) -> str:
     r = session.get(f"{API}/api_token.php", params={"command": "request"}, timeout=TIMEOUT)
-    r.raise_for_status()
-    return r.json()["token"]
+    return _json(r)["token"]
 
 
 def list_categories(session: requests.Session) -> list[dict]:
     r = session.get(f"{API}/api_category.php", timeout=TIMEOUT)
-    r.raise_for_status()
-    return r.json()["trivia_categories"]
+    return _json(r)["trivia_categories"]
 
 
 def category_count(session: requests.Session, cat_id: int) -> int:
     r = session.get(f"{API}/api_count.php", params={"category": cat_id}, timeout=TIMEOUT)
-    r.raise_for_status()
-    return r.json()["category_question_count"]["total_question_count"]
+    return _json(r)["category_question_count"]["total_question_count"]
 
 
 def fetch_batch(session: requests.Session, token: str, category: int | None) -> tuple[int, list[dict]]:
@@ -66,8 +98,7 @@ def fetch_batch(session: requests.Session, token: str, category: int | None) -> 
         params["category"] = category
     for attempt in range(6):
         r = session.get(f"{API}/api.php", params=params, timeout=TIMEOUT)
-        r.raise_for_status()
-        payload = r.json()
+        payload = _json(r)
         code = payload["response_code"]
         if code == 5:                       # rate limit -> backoff
             wait = REQUEST_PAUSE * (attempt + 2)
@@ -99,13 +130,26 @@ def main() -> None:
     ap.add_argument("--limit-categories", type=int, default=None,
                     help="Ne scraper que les N premières catégories (tests).")
     ap.add_argument("--out", default=str(BRONZE_CSV))
+    ap.add_argument("--ca-bundle", default=os.environ.get("REQUESTS_CA_BUNDLE"),
+                    help="Bundle CA personnalisé (réseau à inspection TLS).")
+    ap.add_argument("--insecure", action="store_true",
+                    help="Désactive la vérification TLS (dépannage — non recommandé).")
     args = ap.parse_args()
 
     ensure_dirs()
     session = requests.Session()
     session.headers["User-Agent"] = "EFREI-M2-DEV-benchmark/1.0"
+    if args.insecure:
+        session.verify = False
+        requests.packages.urllib3.disable_warnings()  # type: ignore[attr-defined]
+        print("[!] vérification TLS désactivée (--insecure)", file=sys.stderr)
+    elif args.ca_bundle:
+        session.verify = args.ca_bundle
 
-    token = get_token(session)
+    try:
+        token = get_token(session)
+    except BlockedError as exc:
+        sys.exit(f"\n[scraping impossible] {exc}\n")
     print(f"token = {token}")
     cats = list_categories(session)
     if args.limit_categories:

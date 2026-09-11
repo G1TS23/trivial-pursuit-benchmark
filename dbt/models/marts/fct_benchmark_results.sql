@@ -21,6 +21,8 @@ select
     q.difficulty,
     q.n_options,
     q.question_len,
+    q.question_text,
+    q.correct_answer,
 
     r.raw_answer,
     r.ai_answer,

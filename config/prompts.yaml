@@ -32,7 +32,7 @@ prompts:
       Réponds uniquement par la lettre ({letters}) de la bonne réponse.
 
   - id: p3_role_format
-    active: false
+    active: true
     mode: mcq_letter
     description: "Ajoute un rôle d'expert + interdiction d'explication."
     template: |

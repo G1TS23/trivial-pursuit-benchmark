@@ -83,12 +83,27 @@ class LMStudio:
     def ask(self, prompt: str, *, temperature: float, seed: int,
             max_tokens: int, json_schema: dict | None) -> tuple[str, float, dict]:
         cfg = {"temperature": temperature, "maxTokens": max_tokens, "seed": seed}
-        kwargs = {"config": cfg}
-        if json_schema is not None:
-            kwargs["response_format"] = json_schema
-        t0 = time.perf_counter()
-        res = self._model.respond(prompt, **kwargs)
-        elapsed = time.perf_counter() - t0
+
+        def _call(schema: dict | None):
+            kwargs = {"config": cfg}
+            if schema is not None:
+                kwargs["response_format"] = schema
+            t0 = time.perf_counter()
+            res = self._model.respond(prompt, **kwargs)
+            return res, time.perf_counter() - t0
+
+        try:
+            res, elapsed = _call(json_schema)
+        except Exception:
+            if json_schema is None:
+                raise
+            # Repli sans sortie structurée : certains modèles/backends (ex.
+            # phi-3.5-mini-instruct sur ce build LM Studio, HTTP 400 "Failed to
+            # initialize samplers") ne supportent pas le sampler contraint par
+            # grammaire pour ce schéma. On retombe sur le texte libre ; la
+            # lettre est alors récupérée par regex dans _extract_letter().
+            res, elapsed = _call(None)
+
         stats = {}
         raw_stats = getattr(res, "stats", None)
         if raw_stats is not None:
@@ -184,6 +199,11 @@ def main() -> None:
                     default=int(os.environ.get("SAMPLE_PER_CAT", "0")) or None,
                     help="Échantillon stratifié : au plus N questions par catégorie "
                          "(tirage déterministe via SEED). Défaut $SAMPLE_PER_CAT ou tout.")
+    ap.add_argument("--question-ids-from", default=None,
+                    help="Fichier parquet/csv avec une colonne question_id : restreint "
+                         "exactement à cet ensemble (prioritaire sur --sample-per-cat). "
+                         "Sert à ajouter un modèle/prompt à un échantillon déjà utilisé "
+                         "ailleurs, pour rester comparable (même grain de questions).")
     ap.add_argument("--models", default=None,
                     help="Liste de modèles (défaut : $MODELS).")
     ap.add_argument("--host", default=os.environ.get("LMSTUDIO_HOST", "http://localhost:1234"))
@@ -204,7 +224,13 @@ def main() -> None:
 
     questions = pl.read_parquet(SILVER_QUESTIONS)
     n_full = len(questions)
-    if args.sample_per_cat:
+    if args.question_ids_from:
+        src = (pl.read_parquet(args.question_ids_from) if args.question_ids_from.endswith(".parquet")
+               else pl.read_csv(args.question_ids_from))
+        ids = set(src["question_id"])
+        questions = questions.filter(pl.col("question_id").is_in(ids))
+        print(f"restreint à {len(questions)}/{len(ids)} questions depuis {args.question_ids_from}")
+    elif args.sample_per_cat:
         questions = (
             questions.sort("question_id")           # ordre stable avant tirage
             .group_by("category", maintain_order=True)

@@ -8,6 +8,7 @@ Lancer :  streamlit run dashboard/streamlit_app.py
 """
 from __future__ import annotations
 
+import string
 from pathlib import Path
 
 import altair as alt
@@ -146,9 +147,39 @@ with tab4:
                                  "longueur": "{:.0f}"}), use_container_width=True)
 
 with tab5:
-    st.caption("Réponses fausses — pour l'analyse qualitative des erreurs.")
-    errs = f[~f.ai_correct][
-        ["model", "prompt_id", "category", "difficulty",
-         "question_text", "correct_answer", "raw_answer", "response_time"]
-    ].sample(min(200, (~f.ai_correct).sum()), random_state=0)
-    st.dataframe(errs, use_container_width=True, height=500)
+    st.caption(
+        "Réponses fausses — **`ai_answer`** est déjà décodé (lettre -> texte de "
+        "l'option pour un QCM ; `raw_answer` reste la sortie brute du modèle, "
+        "utile pour retrouver le JSON / la lettre d'origine)."
+    )
+
+    def fmt_options(opts, correct_letter: str) -> str:
+        # `opts` arrive en numpy.ndarray (duckdb -> pandas pour une colonne LIST)
+        try:
+            if opts is None or len(opts) == 0:
+                return ""
+        except TypeError:
+            return ""
+        return "   ".join(
+            f"{'✅' if letter == correct_letter else '▫️'} {letter}) {opt}"
+            for letter, opt in zip(string.ascii_uppercase, opts)
+        )
+
+    err_pool = f[~f.ai_correct].copy()
+    if err_pool.empty:
+        st.info("Aucune réponse fausse pour ces filtres.")
+    else:
+        err_pool["options_fmt"] = [
+            fmt_options(o, c) for o, c in zip(err_pool["options"], err_pool["correct_letter"])
+        ]
+        cols = {
+            "model": "modèle", "prompt_id": "prompt", "category": "catégorie",
+            "difficulty": "difficulté", "question_text": "question",
+            "options_fmt": "options (✅ = bonne)", "correct_answer": "bonne réponse",
+            "ai_answer": "réponse retenue (décodée)", "raw_answer": "sortie brute",
+            "response_time": "temps (s)",
+        }
+        errs = (err_pool[list(cols)]
+                .rename(columns=cols)
+                .sample(min(200, len(err_pool)), random_state=0))
+        st.dataframe(errs, use_container_width=True, height=500)

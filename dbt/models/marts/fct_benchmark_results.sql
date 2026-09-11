@@ -23,6 +23,8 @@ select
     q.question_len,
     q.question_text,
     q.correct_answer,
+    q.correct_letter,
+    q.options,
 
     r.raw_answer,
     r.ai_answer,

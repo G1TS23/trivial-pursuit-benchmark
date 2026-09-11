@@ -10,10 +10,6 @@ macro-paths: ["macros"]
 target-path: "target"
 clean-targets: ["target", "dbt_packages"]
 
-vars:
-  # Emplacements du data lake, relatifs au dossier dbt/ (surchageables par env).
-  silver_dir: "{{ env_var('DBT_SILVER_DIR', '../data/silver') }}"
-
 models:
   trivial_pursuit:
     staging:

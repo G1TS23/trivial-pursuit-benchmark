@@ -10,20 +10,23 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_question')
-              field: question_id
+              arguments:
+                to: ref('dim_question')
+                field: question_id
       - name: model
         tests:
           - not_null
           - relationships:
-              to: ref('dim_model')
-              field: model
+              arguments:
+                to: ref('dim_model')
+                field: model
       - name: ai_correct
         tests: [not_null]
       - name: difficulty
         tests:
           - accepted_values:
-              values: ["easy", "medium", "hard"]
+              arguments:
+                values: ["easy", "medium", "hard"]
 
   - name: dim_question
     columns:

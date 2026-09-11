@@ -4,7 +4,10 @@ sources:
   - name: silver
     description: "Couche silver (Parquet) produite par src/clean_silver.py et src/enrich_lmstudio.py."
     meta:
-      external_location: "read_parquet('{{ var('silver_dir') }}/{name}/**/*.parquet', union_by_name = true)"
+      # env_var() direct : passer par var('silver_dir') se résolvait mal
+      # (la valeur brute, non rendue, de dbt_project.yml était réinjectée telle
+      # quelle -> DuckDB recevait "{{ env_var(...) }}" littéral dans la requête).
+      external_location: "read_parquet('{{ env_var('DBT_SILVER_DIR', '../data/silver') }}/{name}/**/*.parquet', union_by_name = true)"
     tables:
       - name: questions
         description: "Questions nettoyées + QCM déterministe (1 ligne / question)."

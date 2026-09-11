@@ -6,7 +6,9 @@ PY     := $(VENV)/bin/python
 PIP    := $(VENV)/bin/pip
 DBT    := $(VENV)/bin/dbt
 
-export DBT_PROFILES_DIR := dbt
+# Toutes les cibles dbt font `cd dbt` avant d'invoquer dbt : le profil est donc
+# cherché dans le dossier courant après ce cd, d'où "." et non "dbt".
+export DBT_PROFILES_DIR := .
 export DBT_GOLD_DB      := ../data/gold/gold.duckdb
 export DBT_SILVER_DIR   := ../data/silver
 

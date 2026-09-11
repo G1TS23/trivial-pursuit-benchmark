@@ -185,13 +185,18 @@ Le réseau EFREI passe par un proxy **Cato Networks** qui (a) inspecte le TLS et
 
 ## 5. Points de décision d'équipe (TODO)
 
-- [x] Liste finale des modèles (`.env`) : `qwen2.5-3b-instruct`, `gemma-2-2b-it`, `llama-3.2-3b-instruct`.
-- [x] Prompts actifs (`config/prompts.yaml`) : `p1_naif` (open) et `p2_format` (QCM structuré).
+- [x] Liste finale des modèles (`.env`) : `qwen2.5-3b-instruct`, `gemma-2-2b-it`,
+      `llama-3.2-3b-instruct`, `phi-3.5-mini-instruct`.
+- [x] Prompts actifs (`config/prompts.yaml`) : `p1_naif` (open), `p2_format` et
+      `p3_role_format` (QCM structuré).
 - [x] Méthode `ai_correct` de référence : lettre stricte (sortie structurée) pour
-      `p2_format` ; fuzzy/inclusion pour `p1_naif` — voir limites en §6.
-- [x] Échantillon stratifié : `SAMPLE_PER_CAT=75` → 1784 questions (~70/catégorie).
-- [ ] `dim_model` : ajouter un seed `seeds/model_meta.csv` (params, quantization, famille).
-- [ ] Compléter le rapport §6 avec l'analyse par catégorie/difficulté (dashboard) et conclure.
+      `p2_format`/`p3_role_format` ; fuzzy/inclusion pour `p1_naif` — voir limites en §6.
+- [x] Échantillon stratifié : `SAMPLE_PER_CAT=75` → 1784 questions (~70/catégorie),
+      figé (`--question-ids-from`) pour rester comparable entre les 2 runs.
+- [x] `dim_model` enrichie via seed `dbt/seeds/model_meta.csv` (famille, éditeur,
+      taille, contexte, quantization, poids du GGUF).
+- [x] Rapport §6 complet : classement, impact du prompt, par catégorie/difficulté,
+      spot-check manuel, conclusion générale + limites.
 
 ## 6. Résultats — run du 10-11/09/2026 (+ extension du 11/09)
 

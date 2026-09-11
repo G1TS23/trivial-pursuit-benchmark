@@ -193,10 +193,13 @@ Le réseau EFREI passe par un proxy **Cato Networks** qui (a) inspecte le TLS et
 - [ ] `dim_model` : ajouter un seed `seeds/model_meta.csv` (params, quantization, famille).
 - [ ] Compléter le rapport §6 avec l'analyse par catégorie/difficulté (dashboard) et conclure.
 
-## 6. Résultats — run du 10-11/09/2026
+## 6. Résultats — run du 10-11/09/2026 (+ extension du 11/09)
 
 **Config** : 1784 questions (échantillon stratifié, ~70/catégorie, 24 catégories) ×
-3 modèles × 2 prompts = 10 704 réponses. `temperature=0`, seed fixe.
+**4 modèles** × **3 prompts** = 21 408 réponses. `temperature=0`, seed fixe.
+Le 4ᵉ modèle (`phi-3.5-mini-instruct`) et le 3ᵉ prompt (`p3_role_format`) ont
+été ajoutés dans un 2ᵉ run, restreint explicitement (`--question-ids-from`) aux
+**mêmes 1784 questions** que le run initial pour rester comparable.
 
 ### Classement (`marts.agg_model_leaderboard`)
 
@@ -204,17 +207,57 @@ Le réseau EFREI passe par un proxy **Cato Networks** qui (a) inspecte le TLS et
 |---|---|---:|---:|
 | llama-3.2-3b-instruct | `p2_format` (QCM) | **67,6 %** | 0,37 s |
 | gemma-2-2b-it | `p2_format` | 66,6 % | 0,54 s |
+| gemma-2-2b-it | `p3_role_format` (QCM + rôle) | 66,4 % | 0,55 s |
+| llama-3.2-3b-instruct | `p3_role_format` | 64,9 % | 0,70 s |
 | qwen2.5-3b-instruct | `p2_format` | 64,4 % | 0,45 s |
+| phi-3.5-mini-instruct | `p2_format` | 63,4 % | 0,62 s |
+| qwen2.5-3b-instruct | `p3_role_format` | 62,9 % | 0,61 s |
+| phi-3.5-mini-instruct | `p3_role_format` | 60,2 % | 0,28 s |
 | gemma-2-2b-it | `p1_naif` (ouvert) | 43,4 % | 1,26 s |
 | llama-3.2-3b-instruct | `p1_naif` | 39,2 % | 0,82 s |
+| phi-3.5-mini-instruct | `p1_naif` | 35,4 % | 1,85 s |
 | qwen2.5-3b-instruct | `p1_naif` | 35,2 % | 1,18 s |
 
-**Constat n°1 — le prompt contraint domine largement.** Pour les 3 modèles,
-`p2_format` bat `p1_naif` de **+23 à +30 points**, et répond 2 à 3× plus vite
-(sortie JSON courte vs prose libre). C'est la comparaison de prompts demandée
-par le sujet, et elle tranche nettement.
+**Constat n°1 — le prompt contraint domine largement.** Pour les 4 modèles,
+`p2_format`/`p3_role_format` battent `p1_naif` de **+20 à +30 points**, et
+répondent 1,5 à 6× plus vite (sortie JSON courte vs prose libre). C'est la
+comparaison de prompts demandée par le sujet, et elle tranche nettement.
 
-**Constat n°2 — llama-3.2-3b est le plus précis en QCM mais pas le plus verbeux
+**Constat n°2 — le prompt « plus élaboré » n'est pas le plus efficace, contrairement à l'intuition.**
+Le sujet invite à chercher des prompts « encore plus optimisés » (§ Importance
+du prompt) ; on a donc ajouté `p3_role_format` (rôle d'expert + interdiction
+explicite d'expliquer) en plus de `p2_format` (QCM simple, sans rôle). Résultat :
+**`p3_role_format` est *moins* précis que `p2_format` pour les 4 modèles sans
+exception** (-0,2 à -3,1 points selon le modèle — moyenne -1,9 pt). Ajouter du
+contexte et des consignes supplémentaires n'a pas amélioré la justesse ici ;
+l'hypothèse la plus probable est que la contrainte de sortie structurée
+(l'enum de lettres) fait déjà tout le travail utile du "format prompt", et que
+le rôle ajouté n'apporte rien à un modèle 2-4B sur un simple QCM — il ajoute
+seulement des tokens de contexte. Sur le temps de réponse, l'effet est mixte :
+`phi-3.5-mini-instruct` est nettement plus rapide en `p3` (0,28 s vs 0,62 s),
+`llama-3.2-3b-instruct` nettement plus lent (0,70 s vs 0,37 s) — pas de
+tendance unique. **`p2_format` reste donc le meilleur prompt trouvé dans ce
+benchmark**, ce qui est en soi une réponse (négative mais rigoureuse) au défi
+du sujet.
+
+**Constat n°3 — classement des modèles (moyenne `p2_format`+`p3_role_format`,
+les 2 prompts au matching fiable)** :
+
+| modèle | précision moyenne | temps moyen |
+|---|---:|---:|
+| gemma-2-2b-it | **66,5 %** | 0,55 s |
+| llama-3.2-3b-instruct | 66,3 % | 0,53 s |
+| qwen2.5-3b-instruct | 63,7 % | 0,53 s |
+| phi-3.5-mini-instruct | 61,8 % | 0,45 s |
+
+Les 4 modèles restent proches (5,5 points d'écart). `gemma-2-2b-it`
+(2B, quantization Q5_K_M — voir la limite plus bas) et `llama-3.2-3b-instruct`
+(3B, Q4_K_M) se disputent la tête ; `phi-3.5-mini-instruct` est le plus rapide
+en moyenne mais aussi le moins précis, et son mode `p1_naif` a nécessité un
+repli sans sortie structurée (erreur HTTP 500 "peg-native format" sur ce
+build LM Studio pour ce modèle — géré automatiquement, voir `enrich_lmstudio.py`).
+
+**Constat n°4 — llama-3.2-3b est le plus précis en QCM mais pas le plus verbeux
 en ouvert**, gemma-2-2b est meilleur en réponse libre (43,4 % vs 35-39 %) —
 suggère une meilleure capacité à produire une réponse ouverte exploitable,
 indépendamment de la « connaissance » brute mesurée en QCM.
@@ -243,48 +286,47 @@ connaître. C'est précisément pourquoi `p2_format` (réponse contrainte à une
 lettre, via sortie structurée) est la mesure de référence du benchmark, et
 `p1_naif` sert de démonstration du problème plutôt que de score comparable.
 
-### Par difficulté (score de référence `p2_format`)
+### Par difficulté (score de référence `p2_format`, 4 modèles)
 
-| difficulté | précision moyenne (3 modèles) | hasard | écart au hasard |
+| difficulté | précision moyenne | hasard | écart au hasard |
 |---|---:|---:|---:|
-| easy | 73,3 % | 30,1 % | +43,3 pts |
-| medium | 63,9 % | 28,6 % | +35,3 pts |
-| hard | 60,0 % | 27,4 % | +32,5 pts |
+| easy | 72,4 % | 30,1 % | +42,3 pts |
+| medium | 63,1 % | 28,6 % | +34,5 pts |
+| hard | 60,0 % | 27,4 % | +32,6 pts |
 
-La précision baisse logiquement avec la difficulté (-13 pts entre easy et
+La précision baisse logiquement avec la difficulté (-12 pts entre easy et
 hard), mais **l'écart au hasard reste élevé même sur les questions `hard`**
-(+32,5 pts) : les modèles ne s'effondrent pas vers le niveau du hasard, ils
+(+32,6 pts) : les modèles ne s'effondrent pas vers le niveau du hasard, ils
 gardent un vrai signal de connaissance sur les questions difficiles — le label
 de difficulté d'OpenTDB (fixé par les contributeurs) ne les met pas en échec
-autant qu'on pourrait le craindre pour des modèles 2-3B.
+autant qu'on pourrait le craindre pour des modèles 2-4B.
 
-### Par catégorie (score de référence `p2_format`, moyenne des 3 modèles)
+### Par catégorie (score de référence `p2_format`, moyenne des 4 modèles)
 
 | catégories les plus fortes | précision | catégories les plus faibles | précision |
 |---|---:|---|---:|
-| Art | 86,5 % | Entertainment: Video Games | 47,4 % |
-| Mythology | 84,0 % | Entertainment: Japanese Anime & Manga | 48,5 % |
-| Science & Nature | 82,6 % | Entertainment: Board Games | 49,3 % |
-| History | 79,9 % | Entertainment: Cartoon & Animations | 56,0 % |
-| General Knowledge | 75,8 % | Entertainment: Music | 60,4 % |
+| Art | 86,8 % | Entertainment: Japanese Anime & Manga | 46,4 % |
+| Mythology | 82,7 % | Entertainment: Video Games | 47,1 % |
+| Science & Nature | 82,4 % | Entertainment: Board Games | 49,7 % |
+| History | 79,0 % | Entertainment: Cartoon & Animations | 53,8 % |
+| General Knowledge | 75,6 % | Entertainment: Television | 54,0 % |
 
-**Écart de ~39 points entre la meilleure catégorie (Art) et la pire (Video
-Games).** Le clivage est net et cohérent : les modèles excellent sur la
-**culture encyclopédique classique** (art, mythologie, sciences, histoire —
-probablement sur-représentée dans leurs données d'entraînement, avec des faits
-stables et peu ambigus) et échouent sur la **culture pop-geek de niche**
-(mécaniques précises de jeux vidéo, intrigues d'anime, règles de jeux de
-plateau — faits très spécifiques, changeants, peu documentés en texte
-généraliste). Cohérent avec le constat empirique fait pendant le
-développement (§ historique du projet) : les questions les plus dures
-observées portaient déjà sur "Entertainment: Video Games".
+**Écart de ~40 points entre la meilleure catégorie (Art) et la pire (Anime &
+Manga).** Le clivage est net et cohérent, inchangé par l'ajout du 4ᵉ modèle :
+les modèles excellent sur la **culture encyclopédique classique** (art,
+mythologie, sciences, histoire — probablement sur-représentée dans leurs
+données d'entraînement, avec des faits stables et peu ambigus) et échouent sur
+la **culture pop-geek de niche** (mécaniques précises de jeux vidéo, intrigues
+d'anime, règles de jeux de plateau — faits très spécifiques, changeants, peu
+documentés en texte généraliste).
 
 **Divergence entre modèles** la plus marquée : *Celebrities* (llama 66 % /
-gemma 64 % / qwen 47 %, écart 19 pts) et *Cartoon & Animations* (écart 17 pts).
-`llama-3.2-3b-instruct` est systématiquement en tête sur les catégories où les
-modèles divergent le plus ; `qwen2.5-3b-instruct` est le seul à dominer sur
-*Science: Mathematics* (73 % contre 63-64 %) — piste : `qwen2.5` a un
-entraînement renforcé sur les mathématiques, documenté par son éditeur.
+gemma 64 % / phi-3.5 55 % / qwen 47 %, écart 19 pts) et *Cartoon & Animations*
+(écart 18 pts). `llama-3.2-3b-instruct` reste systématiquement en tête sur les
+catégories où les modèles divergent le plus ; `phi-3.5-mini-instruct` prend
+l'avantage sur *Animals* (76 % contre 61-63 %) et `qwen2.5-3b-instruct` reste
+seul en tête sur *Science: Mathematics* (73 % contre 63-64 %) — piste :
+entraînement renforcé sur les mathématiques, documenté par l'éditeur de Qwen2.5.
 
 ### Spot-check manuel (fiabilité du score de référence `p2_format`)
 
@@ -310,26 +352,39 @@ mesure de connaissance comparable.
 
 ### Conclusion générale
 
-1. **Le prompt change tout** : +23 à +30 points de précision et 2-3× plus
-   rapide en imposant un format de réponse (`p2_format`) plutôt qu'en laissant
-   le modèle répondre librement (`p1_naif`) — à budget de calcul égal, la
-   variable la plus rentable n'est pas le choix du modèle mais celui du prompt.
-2. **Les 3 modèles 2-3B sont proches sur le score de référence** (64,4-67,6 %),
-   avec `llama-3.2-3b-instruct` légèrement devant, mais **divergent fortement
-   par catégorie** (jusqu'à 19 pts d'écart sur *Celebrities*) — un classement
-   global masque des profils de force différents.
-3. **La connaissance encyclopédique classique tient, la pop-culture de niche
-   s'effondre** : ~39 pts d'écart entre *Art* (86,5 %) et *Entertainment: Video
-   Games* (47,4 %). Attendu pour des modèles 2-3B dont l'entraînement
-   sur-représente probablement les corpus généralistes.
-4. **La difficulté annotée par OpenTDB dégrade la précision mais pas le signal
-   de connaissance** : même sur `hard`, l'écart au hasard reste de +32,5 pts.
-5. **Le score de référence est fiable** (spot-check 30/30) ; le score du
+1. **Le prompt change tout** : +20 à +30 points de précision en imposant un
+   format de réponse plutôt qu'en laissant le modèle répondre librement
+   (`p1_naif`) — à budget de calcul égal, la variable la plus rentable n'est
+   pas le choix du modèle mais celui du prompt.
+2. **« Plus élaboré » n'est pas « meilleur »** : en réponse directe au défi du
+   sujet (chercher un prompt « encore plus optimisé »), `p3_role_format`
+   (rôle d'expert + consignes renforcées) fait systématiquement **moins bien**
+   que le `p2_format` plus simple, pour les 4 modèles (-0,2 à -3,1 pts). La
+   contrainte de sortie structurée suffisait déjà ; ajouter du contexte n'a
+   rien apporté ici.
+3. **Les 4 modèles sont proches sur le score de référence** (61,8-66,5 % de
+   moyenne QCM), `gemma-2-2b-it` et `llama-3.2-3b-instruct` en tête, mais
+   **divergent fortement par catégorie** (jusqu'à 19 pts d'écart sur
+   *Celebrities*) — un classement global masque des profils de force différents.
+4. **La connaissance encyclopédique classique tient, la pop-culture de niche
+   s'effondre** : ~40 pts d'écart entre *Art* (86,8 %) et *Entertainment:
+   Japanese Anime & Manga* (46,4 %). Attendu pour des modèles 2-4B dont
+   l'entraînement sur-représente probablement les corpus généralistes.
+5. **La difficulté annotée par OpenTDB dégrade la précision mais pas le signal
+   de connaissance** : même sur `hard`, l'écart au hasard reste de +32,6 pts.
+6. **Le score de référence est fiable** (spot-check 30/30) ; le score du
    prompt naïf, lui, ne l'est pas et ne doit pas être comparé sans réserve.
 
-**Limite** : la comparaison de modèles n'est pas à quantization égale —
-`gemma-2-2b-it` tourne en `Q5_K_M` quand `qwen2.5-3b-instruct` et
-`llama-3.2-3b-instruct` sont en `Q4_K_M` (voir `dbt/seeds/model_meta.csv`).
-Une quantization plus fine peut partiellement expliquer pourquoi gemma, le
-plus petit des 3 modèles (2B), reste compétitif — notamment son avance sur
-`p1_naif` (43,4 % vs 35-39 %).
+**Limites** :
+- La comparaison de modèles n'est pas à quantization égale — `gemma-2-2b-it`
+  tourne en `Q5_K_M` quand les 3 autres sont en `Q4_K_M`/`Q4_K_S` (voir
+  `dbt/seeds/model_meta.csv`). Une quantization plus fine peut partiellement
+  expliquer pourquoi gemma, le plus petit modèle (2B), reste compétitif.
+- `phi-3.5-mini-instruct` n'a **jamais réussi la sortie structurée** sur ce
+  build LM Studio (0/1784 réponses JSON valides sur `p2_format` et
+  `p3_role_format` — HTTP 400 "Failed to initialize samplers" à chaque appel) ;
+  le repli automatique vers texte libre + extraction par regex a pris le
+  relais (`enrich_lmstudio.py`). Ses scores QCM reposent donc sur un mécanisme
+  différent des 3 autres modèles — moins garanti, quoique vérifié à 100 %
+  exploitable (`parsable_rate=1.0`). Un autre build LM Studio pourrait changer
+  ce résultat spécifique.

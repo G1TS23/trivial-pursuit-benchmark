@@ -185,11 +185,66 @@ Le réseau EFREI passe par un proxy **Cato Networks** qui (a) inspecte le TLS et
 
 ## 5. Points de décision d'équipe (TODO)
 
-- [ ] Liste finale des modèles (`.env`) et quantizations.
-- [ ] Prompts actifs (`config/prompts.yaml`) — arbitrer budget temps vs finesse d'analyse.
-- [ ] Méthode `ai_correct` de référence + spot-check chiffré à mettre dans le rapport.
-- [ ] Dataset complet (~5248 q) ou **échantillon stratifié** (`SAMPLE_PER_CAT`
-      dans `.env`, ou `--sample-per-cat N`) : N=75 → ~1680 q, ~70/catégorie,
-      distribution difficulté/type préservée, run ~2-3 h. Choix à assumer dans le rapport.
+- [x] Liste finale des modèles (`.env`) : `qwen2.5-3b-instruct`, `gemma-2-2b-it`, `llama-3.2-3b-instruct`.
+- [x] Prompts actifs (`config/prompts.yaml`) : `p1_naif` (open) et `p2_format` (QCM structuré).
+- [x] Méthode `ai_correct` de référence : lettre stricte (sortie structurée) pour
+      `p2_format` ; fuzzy/inclusion pour `p1_naif` — voir limites en §6.
+- [x] Échantillon stratifié : `SAMPLE_PER_CAT=75` → 1784 questions (~70/catégorie).
 - [ ] `dim_model` : ajouter un seed `seeds/model_meta.csv` (params, quantization, famille).
-- [ ] Rédaction du rapport d'analyse (page Streamlit dédiée ou section README).
+- [ ] Compléter le rapport §6 avec l'analyse par catégorie/difficulté (dashboard) et conclure.
+
+## 6. Résultats — run du 10-11/09/2026
+
+**Config** : 1784 questions (échantillon stratifié, ~70/catégorie, 24 catégories) ×
+3 modèles × 2 prompts = 10 704 réponses. `temperature=0`, seed fixe.
+
+### Classement (`marts.agg_model_leaderboard`)
+
+| modèle | prompt | précision | temps médian |
+|---|---|---:|---:|
+| llama-3.2-3b-instruct | `p2_format` (QCM) | **67,6 %** | 0,37 s |
+| gemma-2-2b-it | `p2_format` | 66,6 % | 0,54 s |
+| qwen2.5-3b-instruct | `p2_format` | 64,4 % | 0,45 s |
+| gemma-2-2b-it | `p1_naif` (ouvert) | 43,4 % | 1,26 s |
+| llama-3.2-3b-instruct | `p1_naif` | 39,2 % | 0,82 s |
+| qwen2.5-3b-instruct | `p1_naif` | 35,2 % | 1,18 s |
+
+**Constat n°1 — le prompt contraint domine largement.** Pour les 3 modèles,
+`p2_format` bat `p1_naif` de **+23 à +30 points**, et répond 2 à 3× plus vite
+(sortie JSON courte vs prose libre). C'est la comparaison de prompts demandée
+par le sujet, et elle tranche nettement.
+
+**Constat n°2 — llama-3.2-3b est le plus précis en QCM mais pas le plus verbeux
+en ouvert**, gemma-2-2b est meilleur en réponse libre (43,4 % vs 35-39 %) —
+suggère une meilleure capacité à produire une réponse ouverte exploitable,
+indépendamment de la « connaissance » brute mesurée en QCM.
+
+### Limite méthodologique du matching en mode `p1_naif` (important)
+
+Le prompt `p1_naif` n'impose **aucun format** (`{question}` brut). Sur les
+questions `boolean` en particulier, les modèles répondent souvent en prose
+sans jamais écrire littéralement `True`/`False`, ce que le matcher (fuzzy +
+inclusion textuelle) ne peut pas reconnaître. Sur les 3251 réponses `p1_naif`
+comptées fausses, **772 (23,7 %) portent sur des questions `boolean`**, et
+parmi elles, **36 % contiennent un indice explicite d'accord/désaccord**
+cohérent avec la bonne réponse (`"That's correct!"`, `"is not accurate"`,
+`"This is a myth"`...) sans jamais énoncer le mot attendu. Exemples :
+
+| question | bonne réponse | début de la réponse du modèle | verdict matching |
+|---|---|---|---|
+| *DHCP stands for Dynamic Host Configuration Port.* | False | *"It seems there is a small typo... DHCP actually stands for Dynamic Host Configuration **Protocol**, not Port."* | ❌ faux (aucun `False` littéral) |
+| *Psychology is the science of behavior and mind.* | True | *"**That's correct!** Psychology indeed focuses on..."* | ❌ faux (jamais `True`) |
+| *Type 1 diabetes is a result of the liver working improperly.* | False | *"Type 1 diabetes is **not caused by** the liver working improperly. Instead, it is an autoimmune..."* | ❌ faux (jamais `False`) |
+
+**Conclusion à retenir pour le rapport** : le score `p1_naif` (35-43 %) est un
+**plancher**, pas la vraie compétence des modèles sur ces questions — il mesure
+surtout leur capacité à *formater* une réponse exploitable, pas seulement à la
+connaître. C'est précisément pourquoi `p2_format` (réponse contrainte à une
+lettre, via sortie structurée) est la mesure de référence du benchmark, et
+`p1_naif` sert de démonstration du problème plutôt que de score comparable.
+
+### Reste à écrire (voir dashboard)
+
+- Analyse par catégorie et par difficulté (onglets dédiés, écart au hasard
+  déjà calculé dans `agg_accuracy_by_difficulty`).
+- Spot-check manuel sur `p2_format` (le score de référence) pour confirmer sa fiabilité.

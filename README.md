@@ -4,9 +4,33 @@ Projet **M2 DEV — EFREI**. Pipeline complet de data engineering : collecte
 (OpenTDB) → enrichissement par un LLM local (LM Studio) → couche métier (dbt +
 DuckDB) → dashboard interactif (Streamlit).
 
-> État : **squelette**. Le code d'ingestion / nettoyage / enrichissement et le
-> projet dbt sont fonctionnels ; les points de décision d'équipe sont signalés
-> par des `TODO` et concentrés dans `config/prompts.yaml` et `.env`.
+> État : **complet**. Pipeline exécuté de bout en bout (scraping, enrichissement
+> IA, gold dbt, dashboard) ; voir les résultats et la conclusion en § 6.
+
+## Sommaire
+
+- [1. Méthodologie](#1-méthodologie)
+  - [Architecture en médaillon](#architecture-en-médaillon)
+  - [Étape 1 — Scraping OpenTDB](#étape-1--scraping-opentdb)
+  - [Étape 2 — Enrichissement IA (LM Studio)](#étape-2--enrichissement-ia-lm-studio)
+  - [Étape 3 — Couche gold (dbt) + dashboard](#étape-3--couche-gold-dbt--dashboard)
+- [2. Organisation du dépôt](#2-organisation-du-dépôt)
+- [3. Setup complet](#3-setup-complet)
+  - [Pré-requis](#pré-requis)
+  - [Installation](#installation)
+  - [Modèles LM Studio](#modèles-lm-studio)
+  - [Exécution](#exécution)
+  - [Alternative au SDK `lmstudio`](#alternative-au-sdk-lmstudio)
+  - [Dépannage réseau (proxy EFREI / Cato)](#dépannage-réseau-proxy-efrei--cato)
+- [4. Livrables](#4-livrables)
+- [5. Points de décision d'équipe (TODO)](#5-points-de-décision-déquipe-todo)
+- [6. Résultats — run du 10-11/09/2026 (+ extension du 11/09)](#6-résultats--run-du-10-11092026--extension-du-1109)
+  - [Classement (`marts.agg_model_leaderboard`)](#classement-martsagg_model_leaderboard)
+  - [Limite méthodologique du matching en mode `p1_naif`](#limite-méthodologique-du-matching-en-mode-p1_naif-important)
+  - [Par difficulté](#par-difficulté-score-de-référence-p2_format-4-modèles)
+  - [Par catégorie](#par-catégorie-score-de-référence-p2_format-moyenne-des-4-modèles)
+  - [Spot-check manuel](#spot-check-manuel-fiabilité-du-score-de-référence-p2_format)
+  - [Conclusion générale](#conclusion-générale)
 
 ## 1. Méthodologie
 

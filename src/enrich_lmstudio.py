@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 import polars as pl
 import yaml
 from rapidfuzz import fuzz
+from tqdm import tqdm
 
 from common import (
     PROMPTS_YAML,
@@ -71,7 +72,7 @@ class LMStudio:
                 self._model.unload()
             except Exception:
                 pass
-        print(f"  chargement du modèle : {model_key}")
+        tqdm.write(f"  chargement du modèle : {model_key}")
         self._model = self._lms.llm(model_key)
         self._model_key = model_key
         # warm-up non mesuré (exclut le temps de chargement du 1er appel réel)
@@ -246,17 +247,30 @@ def main() -> None:
 
     client = LMStudio(args.host)
 
+    # Barre globale : avancement sur l'ensemble des combos (modèle, prompt) ;
+    # + une barre imbriquée par combo (une ligne par question, stats en direct).
+    combos = [(m, p) for m in models for p in prompts]
+    outer = tqdm(total=len(combos), desc="combos modèle×prompt", unit="combo",
+                position=0, leave=True)
+
     for model in models:
         done = existing_keys(model)
         client.load(model)
         for prompt in prompts:
             pid, mode, tpl = prompt["id"], prompt["mode"], prompt["template"]
+            outer.set_description(f"combos modèle×prompt [{model}/{pid}]")
+            todo = [q for q in q_records if f"{q['question_id']}|{pid}" not in done]
+            skipped = len(q_records) - len(todo)
+            if not todo:
+                tqdm.write(f"  {model}/{pid} : rien à faire ({skipped} déjà présents)")
+                outer.update(1)
+                continue
+
             rows: list[dict] = []
-            skipped = 0
-            for q in q_records:
-                if f"{q['question_id']}|{pid}" in done:
-                    skipped += 1
-                    continue
+            n_correct = n_parsable = n_errors = 0
+            sum_time = 0.0
+            inner = tqdm(todo, desc=f"  {model}/{pid}", unit="q", position=1, leave=False)
+            for q in inner:
                 text = render_prompt(tpl, q)
                 schema = schema_for(mode, q["n_options"])
                 try:
@@ -265,9 +279,20 @@ def main() -> None:
                         max_tokens=max_tokens, json_schema=schema,
                     )
                 except Exception as exc:                       # noqa: BLE001
-                    print(f"    [erreur] {model}/{pid} q={q['question_id']}: {exc}")
+                    n_errors += 1
+                    tqdm.write(f"    [erreur] {model}/{pid} q={q['question_id']}: {exc}")
                     continue
                 ok, ai_answer, parsable, method = grade(mode, raw, q)
+                n_correct += int(ok)
+                n_parsable += int(parsable)
+                sum_time += elapsed
+                n_done = len(rows) + 1
+                inner.set_postfix({
+                    "acc": f"{n_correct / n_done:.0%}",
+                    "parsable": f"{n_parsable / n_done:.0%}",
+                    "t_moy": f"{sum_time / n_done:.2f}s",
+                    "err": n_errors,
+                })
                 rows.append({
                     "question_id": q["question_id"],
                     "model": model,
@@ -287,20 +312,22 @@ def main() -> None:
                     "ttft_sec": stats.get("time_to_first_token_sec"),
                     "tokens_per_second": stats.get("tokens_per_second"),
                 })
-            if not rows:
-                print(f"  {model}/{pid} : rien à faire ({skipped} déjà présents)")
-                continue
-            out_dir = SILVER_RESPONSES_DIR / f"model={model}" / f"prompt={pid}"
-            out_dir.mkdir(parents=True, exist_ok=True)
-            out_path = out_dir / "part.parquet"
-            new_df = pl.DataFrame(rows)
-            if out_path.exists():
-                new_df = pl.concat([pl.read_parquet(out_path), new_df], how="diagonal_relaxed")
-            new_df.write_parquet(out_path)
-            acc = new_df["ai_correct"].mean()
-            print(f"  {model}/{pid} : +{len(rows)} (skip {skipped}) "
-                  f"-> {out_path.name}  acc={acc:.1%}")
+            inner.close()
 
+            if rows:
+                out_dir = SILVER_RESPONSES_DIR / f"model={model}" / f"prompt={pid}"
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out_path = out_dir / "part.parquet"
+                new_df = pl.DataFrame(rows)
+                if out_path.exists():
+                    new_df = pl.concat([pl.read_parquet(out_path), new_df], how="diagonal_relaxed")
+                new_df.write_parquet(out_path)
+                acc = new_df["ai_correct"].mean()
+                tqdm.write(f"  {model}/{pid} : +{len(rows)} (skip {skipped}, erreurs {n_errors}) "
+                          f"-> {out_path.name}  acc={acc:.1%}")
+            outer.update(1)
+
+    outer.close()
     print("terminé.")
 
 

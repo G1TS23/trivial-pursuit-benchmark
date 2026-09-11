@@ -34,6 +34,7 @@ import time
 from datetime import datetime, timezone
 
 import requests
+from tqdm import tqdm
 
 from common import BRONZE_CSV, ensure_dirs, question_id
 
@@ -137,7 +138,7 @@ def fetch_batch(c: Client, token: str, category: int | None) -> tuple[int, list[
         code = payload["response_code"]
         if code == 5:                       # rate limit -> backoff supplémentaire
             wait = REQUEST_PAUSE * (attempt + 2)
-            print(f"  [code 5 / rate limit] pause {wait:.0f}s", file=sys.stderr)
+            tqdm.write(f"  [code 5 / rate limit] pause {wait:.0f}s")
             time.sleep(wait)
             continue
         return code, payload.get("results", [])
@@ -161,8 +162,9 @@ def parse_row(raw: dict) -> dict:
 
 
 def collect(c: Client, token: str, category: int | None, seen: set[str],
-            rows: list[dict], cap: int | None) -> int:
+            rows: list[dict], cap: int | None, pbar: tqdm | None = None) -> int:
     got = 0
+    dup = 0
     while True:
         code, results = fetch_batch(c, token, category)
         if code in (1, 4):                   # plus de questions pour cette requête
@@ -175,10 +177,14 @@ def collect(c: Client, token: str, category: int | None, seen: set[str],
         for raw in results:
             row = parse_row(raw)
             if row["question_id"] in seen:
+                dup += 1
                 continue
             seen.add(row["question_id"])
             rows.append(row)
             got += 1
+            if pbar is not None:
+                pbar.update(1)
+                pbar.set_postfix({"doublons": dup})
             if cap and len(rows) >= cap:
                 return got
 
@@ -212,31 +218,35 @@ def main() -> None:
         token = get_token(c)
         print(f"token = {token}")
 
-        seen: set[str] = set()
-        rows: list[dict] = []
-
-        if args.by_category:
-            for i, cat in enumerate(list_categories(c), 1):
-                cid, cname = cat["id"], cat["name"]
-                n = collect(c, token, cid, seen, rows, args.max_questions)
-                print(f"[{i:2}] {cname:<35} +{n}")
-                if args.max_questions and len(rows) >= args.max_questions:
-                    break
-        else:
-            print("mode flux unique (toutes catégories)…")
-            while True:
-                before = len(rows)
-                collect(c, token, None, seen, rows, args.max_questions)
-                print(f"  {len(rows)} questions cumulées")
-                if len(rows) == before:      # code 4 : plus rien
-                    break
-                if args.max_questions and len(rows) >= args.max_questions:
-                    break
-
+        # Récupéré tôt (pas seulement en fin de run) pour servir de total à la
+        # barre de progression -> ETA et débit dès le départ.
         try:
             expected = global_verified_count(c)
         except Exception:                    # noqa: BLE001
             expected = None
+        target = args.max_questions or expected
+
+        seen: set[str] = set()
+        rows: list[dict] = []
+
+        with tqdm(total=target, desc="scraping OpenTDB", unit="q") as pbar:
+            if args.by_category:
+                for i, cat in enumerate(list_categories(c), 1):
+                    cid, cname = cat["id"], cat["name"]
+                    pbar.set_description(f"scraping OpenTDB [{cname}]")
+                    n = collect(c, token, cid, seen, rows, args.max_questions, pbar)
+                    tqdm.write(f"[{i:2}] {cname:<35} +{n}")
+                    if args.max_questions and len(rows) >= args.max_questions:
+                        break
+            else:
+                pbar.set_description("scraping OpenTDB [flux unique]")
+                while True:
+                    before = len(rows)
+                    collect(c, token, None, seen, rows, args.max_questions, pbar)
+                    if len(rows) == before:      # code 4 : plus rien
+                        break
+                    if args.max_questions and len(rows) >= args.max_questions:
+                        break
     except BlockedError as exc:
         sys.exit(f"\n[scraping impossible] {exc}\n")
 

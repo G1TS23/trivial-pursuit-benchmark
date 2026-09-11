@@ -5,6 +5,7 @@ polars>=1.9
 pyarrow>=17
 pyyaml>=6.0
 rapidfuzz>=3.9
+tqdm>=4.66              # barres de progression (scraping + enrichissement)
 
 # Enrichissement IA (LM Studio)
 lmstudio>=1.0          # SDK officiel ; fallback possible : openai>=1.40

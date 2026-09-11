@@ -97,14 +97,18 @@ with tab1:
 
 with tab2:
     by_cat = (f.groupby(["model", "category"]).ai_correct.mean().reset_index())
+    n_cat = by_cat["category"].nunique()
     st.altair_chart(
         alt.Chart(by_cat).mark_rect().encode(
-            x=alt.X("category:N", title=None, sort="-y"),
-            y=alt.Y("model:N", title=None),
+            # catégories en lignes (souvent 24, labels longs) : bien plus lisible
+            # que 24 colonnes écrasées sur l'axe X.
+            y=alt.Y("category:N", title=None,
+                    sort=alt.EncodingSortField(field="ai_correct", op="mean", order="descending")),
+            x=alt.X("model:N", title=None, axis=alt.Axis(labelAngle=-30)),
             color=alt.Color("ai_correct:Q", title="Précision",
                             scale=alt.Scale(scheme="blues")),
             tooltip=["model", "category", alt.Tooltip("ai_correct", format=".1%")],
-        ).properties(height=60 + 22 * f.model.nunique()),
+        ).properties(height=26 * n_cat + 40),
         use_container_width=True,
     )
 

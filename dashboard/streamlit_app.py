@@ -83,17 +83,28 @@ with tab1:
                                   "tps_median": "{:.2f} s"}), use_container_width=True)
 
     st.subheader("Précision vs latence (frontière de Pareto)")
-    pareto = (f.groupby("model")
-                .agg(precision=("ai_correct", "mean"),
-                     tps_median=("response_time", "median")).reset_index())
-    st.altair_chart(
-        alt.Chart(pareto).mark_circle(size=200).encode(
-            x=alt.X("tps_median", title="Temps médian (s)"),
-            y=alt.Y("precision", title="Précision", axis=alt.Axis(format="%")),
-            color="model", tooltip=["model", "precision", "tps_median"],
-        ).interactive(),
-        use_container_width=True,
+    st.caption("Un point par (modèle, prompt) — regarde si les points se "
+               "regroupent plutôt par couleur (modèle) ou par forme (prompt).")
+    base = alt.Chart(lb).encode(
+        # zero=False : sans ça Vega-Lite force l'axe à démarrer à 0/0%, ce qui
+        # laisse presque tout le graphique vide vu que les points sont
+        # regroupés dans une zone étroite (0,3-1,3 s / 35-68 %).
+        x=alt.X("tps_median:Q", title="Temps médian (s)", scale=alt.Scale(zero=False)),
+        y=alt.Y("precision:Q", title="Précision", axis=alt.Axis(format="%"),
+                scale=alt.Scale(zero=False)),
     )
+    points = base.mark_point(size=260, filled=True, opacity=0.85).encode(
+        color=alt.Color("model:N", title="Modèle"),
+        shape=alt.Shape("prompt_id:N", title="Prompt"),
+        tooltip=["model", "prompt_id", alt.Tooltip("precision", format=".1%"),
+                 alt.Tooltip("tps_median", format=".2f"), alt.Tooltip("n", title="n questions")],
+    )
+    labels = base.mark_text(dy=-14, fontSize=10).encode(
+        text="model:N", color=alt.value("#666"),
+        detail="prompt_id:N",
+    )
+    st.altair_chart((points + labels).properties(height=420).interactive(),
+                    use_container_width=True)
 
 with tab2:
     by_cat = (f.groupby(["model", "category"]).ai_correct.mean().reset_index())

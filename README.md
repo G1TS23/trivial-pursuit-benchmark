@@ -243,8 +243,50 @@ connaître. C'est précisément pourquoi `p2_format` (réponse contrainte à une
 lettre, via sortie structurée) est la mesure de référence du benchmark, et
 `p1_naif` sert de démonstration du problème plutôt que de score comparable.
 
-### Reste à écrire (voir dashboard)
+### Par difficulté (score de référence `p2_format`)
 
-- Analyse par catégorie et par difficulté (onglets dédiés, écart au hasard
-  déjà calculé dans `agg_accuracy_by_difficulty`).
+| difficulté | précision moyenne (3 modèles) | hasard | écart au hasard |
+|---|---:|---:|---:|
+| easy | 73,3 % | 30,1 % | +43,3 pts |
+| medium | 63,9 % | 28,6 % | +35,3 pts |
+| hard | 60,0 % | 27,4 % | +32,5 pts |
+
+La précision baisse logiquement avec la difficulté (-13 pts entre easy et
+hard), mais **l'écart au hasard reste élevé même sur les questions `hard`**
+(+32,5 pts) : les modèles ne s'effondrent pas vers le niveau du hasard, ils
+gardent un vrai signal de connaissance sur les questions difficiles — le label
+de difficulté d'OpenTDB (fixé par les contributeurs) ne les met pas en échec
+autant qu'on pourrait le craindre pour des modèles 2-3B.
+
+### Par catégorie (score de référence `p2_format`, moyenne des 3 modèles)
+
+| catégories les plus fortes | précision | catégories les plus faibles | précision |
+|---|---:|---|---:|
+| Art | 86,5 % | Entertainment: Video Games | 47,4 % |
+| Mythology | 84,0 % | Entertainment: Japanese Anime & Manga | 48,5 % |
+| Science & Nature | 82,6 % | Entertainment: Board Games | 49,3 % |
+| History | 79,9 % | Entertainment: Cartoon & Animations | 56,0 % |
+| General Knowledge | 75,8 % | Entertainment: Music | 60,4 % |
+
+**Écart de ~39 points entre la meilleure catégorie (Art) et la pire (Video
+Games).** Le clivage est net et cohérent : les modèles excellent sur la
+**culture encyclopédique classique** (art, mythologie, sciences, histoire —
+probablement sur-représentée dans leurs données d'entraînement, avec des faits
+stables et peu ambigus) et échouent sur la **culture pop-geek de niche**
+(mécaniques précises de jeux vidéo, intrigues d'anime, règles de jeux de
+plateau — faits très spécifiques, changeants, peu documentés en texte
+généraliste). Cohérent avec le constat empirique fait pendant le
+développement (§ historique du projet) : les questions les plus dures
+observées portaient déjà sur "Entertainment: Video Games".
+
+**Divergence entre modèles** la plus marquée : *Celebrities* (llama 66 % /
+gemma 64 % / qwen 47 %, écart 19 pts) et *Cartoon & Animations* (écart 17 pts).
+`llama-3.2-3b-instruct` est systématiquement en tête sur les catégories où les
+modèles divergent le plus ; `qwen2.5-3b-instruct` est le seul à dominer sur
+*Science: Mathematics* (73 % contre 63-64 %) — piste : `qwen2.5` a un
+entraînement renforcé sur les mathématiques, documenté par son éditeur.
+
+### Reste à écrire
+
 - Spot-check manuel sur `p2_format` (le score de référence) pour confirmer sa fiabilité.
+- Conclusion générale du rapport (synthèse des 4 constats ci-dessus).

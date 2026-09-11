@@ -103,7 +103,9 @@ with tab2:
             # catégories en lignes (souvent 24, labels longs) : bien plus lisible
             # que 24 colonnes écrasées sur l'axe X.
             y=alt.Y("category:N", title=None,
-                    sort=alt.EncodingSortField(field="ai_correct", op="mean", order="descending")),
+                    sort=alt.EncodingSortField(field="ai_correct", op="mean", order="descending"),
+                    # défaut Altair = 100px -> tronque "Entertainment: Japanese Anime & Manga"
+                    axis=alt.Axis(labelLimit=280)),
             x=alt.X("model:N", title=None, axis=alt.Axis(labelAngle=-30)),
             color=alt.Color("ai_correct:Q", title="Précision",
                             scale=alt.Scale(scheme="blues")),

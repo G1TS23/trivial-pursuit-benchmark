@@ -1,4 +1,4 @@
-model,family,publisher,params_b,context_window,quantization
-qwen2.5-3b-instruct,Qwen2.5,Alibaba (Qwen team),3,32768,TODO
-gemma-2-2b-it,Gemma 2,Google DeepMind,2,8192,TODO
-llama-3.2-3b-instruct,Llama 3.2,Meta,3,131072,TODO
+model,family,publisher,params_b,context_window,quantization,file_size_gb
+qwen2.5-3b-instruct,Qwen2.5,Alibaba (Qwen team),3,32768,Q4_K_M,1.9
+gemma-2-2b-it,Gemma 2,Google DeepMind,2,8192,Q5_K_M,1.9
+llama-3.2-3b-instruct,Llama 3.2,Meta,3,131072,Q4_K_M,2.0

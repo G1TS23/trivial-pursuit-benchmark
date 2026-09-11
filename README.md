@@ -326,3 +326,10 @@ mesure de connaissance comparable.
    de connaissance** : même sur `hard`, l'écart au hasard reste de +32,5 pts.
 5. **Le score de référence est fiable** (spot-check 30/30) ; le score du
    prompt naïf, lui, ne l'est pas et ne doit pas être comparé sans réserve.
+
+**Limite** : la comparaison de modèles n'est pas à quantization égale —
+`gemma-2-2b-it` tourne en `Q5_K_M` quand `qwen2.5-3b-instruct` et
+`llama-3.2-3b-instruct` sont en `Q4_K_M` (voir `dbt/seeds/model_meta.csv`).
+Une quantization plus fine peut partiellement expliquer pourquoi gemma, le
+plus petit des 3 modèles (2B), reste compétitif — notamment son avance sur
+`p1_naif` (43,4 % vs 35-39 %).

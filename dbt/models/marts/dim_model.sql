@@ -16,6 +16,7 @@ select
     meta.publisher,
     meta.params_b,
     meta.context_window,
-    meta.quantization
+    meta.quantization,
+    meta.file_size_gb
 from used
 left join meta using (model)

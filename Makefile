@@ -42,6 +42,9 @@ enrich: ## Étape 2b : réponses des modèles LM Studio -> data/silver/responses
 build: ## Étape 3a : construction de la couche gold avec dbt
 	cd dbt && $(abspath $(DBT)) build
 
+build-full: ## build --full-refresh (nécessaire après un changement de colonnes d'un seed, ex. model_meta.csv)
+	cd dbt && $(abspath $(DBT)) build --full-refresh
+
 test: ## Tests dbt seuls
 	cd dbt && $(abspath $(DBT)) test
 

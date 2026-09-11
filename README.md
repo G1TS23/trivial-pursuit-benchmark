@@ -286,7 +286,43 @@ modèles divergent le plus ; `qwen2.5-3b-instruct` est le seul à dominer sur
 *Science: Mathematics* (73 % contre 63-64 %) — piste : `qwen2.5` a un
 entraînement renforcé sur les mathématiques, documenté par son éditeur.
 
-### Reste à écrire
+### Spot-check manuel (fiabilité du score de référence `p2_format`)
 
-- Spot-check manuel sur `p2_format` (le score de référence) pour confirmer sa fiabilité.
-- Conclusion générale du rapport (synthèse des 4 constats ci-dessus).
+**Méthode** : échantillon aléatoire reproductible (`seed=42`), 30 réponses
+`p2_format` — 15 tirées parmi les `ai_correct=True`, 15 parmi les
+`ai_correct=False` (stratifié pour couvrir les deux sens d'erreur possibles).
+Pour chaque ligne, vérification manuelle que (a) la `correct_answer` d'OpenTDB
+est factuellement exacte et (b) le verdict `ai_correct` reflète bien la
+comparaison lettre choisie / lettre attendue.
+
+**Résultat** : **30/30 verdicts confirmés corrects (100 %)** ; 2 questions trop
+pointues pour être vérifiées avec certitude (mème 4chan « 404 Girl », détail de
+dialogue *Gravity Falls*) mais sans anomalie détectée. **0 erreur de matching.**
+Cohérent avec le mécanisme : `p2_format` compare une lettre unique issue d'une
+sortie JSON contrainte à la lettre pré-calculée en silver (0 incohérence
+lettre/option détectée sur les 5248 questions, cf. `clean_silver.py`) — pas de
+place pour l'ambiguïté observée en mode `p1_naif` ci-dessus.
+
+**Conclusion méthodologique** : le score `p2_format` (64-68 % selon le modèle)
+est fiable et sert de métrique de référence du rapport ; `p1_naif` doit être
+présenté comme un score plancher illustrant l'effet du prompt, pas comme une
+mesure de connaissance comparable.
+
+### Conclusion générale
+
+1. **Le prompt change tout** : +23 à +30 points de précision et 2-3× plus
+   rapide en imposant un format de réponse (`p2_format`) plutôt qu'en laissant
+   le modèle répondre librement (`p1_naif`) — à budget de calcul égal, la
+   variable la plus rentable n'est pas le choix du modèle mais celui du prompt.
+2. **Les 3 modèles 2-3B sont proches sur le score de référence** (64,4-67,6 %),
+   avec `llama-3.2-3b-instruct` légèrement devant, mais **divergent fortement
+   par catégorie** (jusqu'à 19 pts d'écart sur *Celebrities*) — un classement
+   global masque des profils de force différents.
+3. **La connaissance encyclopédique classique tient, la pop-culture de niche
+   s'effondre** : ~39 pts d'écart entre *Art* (86,5 %) et *Entertainment: Video
+   Games* (47,4 %). Attendu pour des modèles 2-3B dont l'entraînement
+   sur-représente probablement les corpus généralistes.
+4. **La difficulté annotée par OpenTDB dégrade la précision mais pas le signal
+   de connaissance** : même sur `hard`, l'écart au hasard reste de +32,5 pts.
+5. **Le score de référence est fiable** (spot-check 30/30) ; le score du
+   prompt naïf, lui, ne l'est pas et ne doit pas être comparé sans réserve.

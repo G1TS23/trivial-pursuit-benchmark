@@ -14,6 +14,11 @@ data/gold/*
 # Exception : la source OpenTDB est bloquée sur le réseau EFREI (proxy Cato).
 # On versionne le CSV bronze une fois scrapé ailleurs, pour ne plus dépendre du réseau.
 !data/bronze/questions_raw.csv
+# Silver (Parquet) versionné : permet de reconstruire le gold avec dbt et de
+# retrouver les chiffres du rapport SANS LM Studio ni heures de calcul.
+# Le gold (gold.duckdb) reste ignoré : il est reconstruit par `dbt build`.
+!data/silver/questions/
+!data/silver/responses/
 
 # --- Certificats CA d'entreprise (réseau à inspection TLS), spécifiques au poste ---
 certs/

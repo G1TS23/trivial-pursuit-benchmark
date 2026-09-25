@@ -18,6 +18,7 @@ while IFS= read -r f; do
   case "$f" in
     # exceptions versionnées volontairement (source injoignable depuis EFREI)
     data/bronze/questions_raw.csv) : ;;
+    data/silver/*.parquet) : ;;   # silver versionné (reconstruction du gold sans LM Studio)
     data/*/*)
       [ "$(basename "$f")" != ".gitkeep" ] && say "fichier du data lake stagé : $f" ;;
     .env|*/.env)

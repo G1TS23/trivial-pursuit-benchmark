@@ -21,10 +21,9 @@ help:
 venv: ## Crée le virtualenv
 	$(PYTHON) -m venv $(VENV)
 
-install: venv hooks ## Installe les dépendances + packages dbt + hook pre-commit
+install: venv hooks ## Installe les dépendances + hook pre-commit
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
-	cd dbt && $(abspath $(DBT)) deps
 
 hooks: ## Active le hook pre-commit versionné (.githooks/)
 	git config core.hooksPath .githooks

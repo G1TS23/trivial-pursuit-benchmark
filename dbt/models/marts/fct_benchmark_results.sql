@@ -8,7 +8,7 @@ q as (
 )
 
 select
-    {{ dbt_utils.generate_surrogate_key(['r.question_id', 'r.model', 'r.prompt_id', 'r.run_id']) }} as result_key,
+    {{ surrogate_key(['r.question_id', 'r.model', 'r.prompt_id', 'r.run_id']) }} as result_key,
     r.question_id,
     r.model,
     r.prompt_id,

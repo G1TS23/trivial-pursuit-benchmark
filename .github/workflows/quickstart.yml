@@ -5,7 +5,9 @@ name: quickstart
 
 on:
   push:
+    paths-ignore: ["**.md", "docs/**"]   # inutile de rejouer la CI pour de la doc seule
   pull_request:
+    paths-ignore: ["**.md", "docs/**"]
   workflow_dispatch:
 
 env:
@@ -15,16 +17,16 @@ jobs:
   quickstart:
     name: ${{ matrix.os }} / py${{ matrix.python }}
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.experimental || false }}
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        python: ["3.13"]
+        # Windows/Linux : 3.12 -> 3.14 (un correcteur qui installe Python
+        # aujourd'hui obtient 3.14). macOS : une seule version (minutes x10 en
+        # dépôt privé).
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.12", "3.13", "3.14"]
         include:
-          - {os: ubuntu-latest, python: "3.12"}
-          # Informatif : le README affirmait que dbt ne supporte pas 3.14.
-          - {os: ubuntu-latest, python: "3.14", experimental: true}
+          - {os: macos-latest, python: "3.13"}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -1,5 +1,7 @@
 # Trivial poursuite — Benchmark de modèles d'IA sur des questions de culture générale
 
+[![quickstart](https://github.com/G1TS23/trivial-pursuit-benchmark/actions/workflows/quickstart.yml/badge.svg)](https://github.com/G1TS23/trivial-pursuit-benchmark/actions/workflows/quickstart.yml)
+
 Projet **M2 DEV — EFREI**. Pipeline complet de data engineering : collecte
 (OpenTDB) → enrichissement par un LLM local (LM Studio) → couche métier (dbt +
 DuckDB) → dashboard interactif (Streamlit).
@@ -7,8 +9,86 @@ DuckDB) → dashboard interactif (Streamlit).
 > État : **complet**. Pipeline exécuté de bout en bout (scraping, enrichissement
 > IA, gold dbt, dashboard) ; voir les résultats et la conclusion en § 6.
 
+## Démarrage rapide (sans LM Studio)
+
+Le dépôt **embarque les données** : les 13 fichiers Parquet de `data/silver/` (questions + réponses des 4 modèles × 3 prompts, 2,6 Mo) et le CSV bronze. `dbt build` reconstruit donc la
+couche gold (tests inclus) et le dashboard affiche exactement les résultats du
+rapport — **sans LM Studio ni calcul long**. Durée : environ 5 minutes.
+
+**Prérequis** : Git et Python 3.12, 3.13 ou 3.14 (testé en intégration continue sur
+Windows et Linux ; macOS en 3.13 — voir le badge ci-dessus). Rien d'autre à installer.
+
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/G1TS23/trivial-pursuit-benchmark.git
+cd trivial-pursuit-benchmark
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+cd dbt
+dbt build
+cd ..
+streamlit run dashboard/streamlit_app.py
+```
+
+- Si PowerShell refuse `Activate.ps1` (« l'exécution de scripts est désactivée ») :
+  `Set-ExecutionPolicy -Scope Process Bypass`, puis relancer l'activation.
+  Dans `cmd.exe` : `.venv\Scripts\activate.bat`.
+- Sans activer le venv : `.\.venv\Scripts\pip install -r requirements.txt`,
+  `.\.venv\Scripts\dbt build`, `.\.venv\Scripts\streamlit run dashboard/streamlit_app.py`.
+- Si la commande `py` n'existe pas (Python du Microsoft Store) : remplacer `py -3` par `python`.
+- Accents illisibles dans la console : `$env:PYTHONUTF8 = "1"`.
+- **`make` n'est pas nécessaire** (il n'existe pas sous Windows natif) : voir le tableau d'équivalence ci-dessous.
+
+### macOS / Linux / WSL
+
+```bash
+git clone https://github.com/G1TS23/trivial-pursuit-benchmark.git && cd trivial-pursuit-benchmark
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+(cd dbt && dbt build)
+streamlit run dashboard/streamlit_app.py
+```
+
+Ou, avec `make` : `make install PYTHON=python3 && make build && make dashboard`.
+Sous **WSL**, travaille dans le système de fichiers Linux (`~/...`) plutôt que sous
+`/mnt/c/...` (beaucoup plus lent). Le dashboard s'ouvre normalement dans le navigateur
+Windows sur http://localhost:8501.
+
+### Résultat attendu
+
+- `dbt build` se termine par `Done. PASS=28 WARN=0 ERROR=0`.
+- Streamlit sert http://localhost:8501 : **5 onglets** ; l'onglet « Classement »
+  place `llama-3.2-3b-instruct` / `p2_format` en tête avec **67,6 %** de précision.
+- Vérification automatique, sans navigateur : `python tests/smoke_dashboard.py`
+  → `OK : dashboard rendu sans erreur`.
+
+Le silver livré est celui du **run publié** : 1784 questions, figées avec `--question-ids-from` (un tirage `SAMPLE_PER_CAT=75` avec les défauts en donne 1679, toutes déjà présentes → `make enrich` n'a alors plus rien à calculer).
+
+### Équivalence `make` ↔ commandes
+
+| `make …` | Commande brute |
+|---|---|
+| `make install` | `python -m venv .venv`, activer, `pip install -r requirements.txt` |
+| `make build` | `cd dbt` puis `dbt build` |
+| `make dashboard` | `streamlit run dashboard/streamlit_app.py` |
+| `make scrape` | `python src/scrape_opentdb.py` (réseau ; le CSV bronze est déjà livré) |
+| `make clean-silver` | `python src/clean_silver.py` |
+| `make enrich ARGS="--limit 20"` | `python src/enrich_lmstudio.py --limit 20` (LM Studio requis) |
+
+### Dépannage rapide
+
+- `dbt : commande introuvable` → le venv n'est pas activé.
+- `Could not set lock on file ... gold.duckdb` → un dashboard est encore ouvert : le fermer,
+  puis relancer `dbt build` (DuckDB n'admet qu'un seul écrivain).
+- Port 8501 occupé : `streamlit run dashboard/streamlit_app.py --server.port 8502`.
+
+Pour **refaire tourner la génération** des données (LM Studio, plusieurs heures) : § 3 « Setup complet ».
+
 ## Sommaire
 
+- [Démarrage rapide (sans LM Studio)](#démarrage-rapide-sans-lm-studio)
 - [1. Méthodologie](#1-méthodologie)
   - [Architecture en médaillon](#architecture-en-médaillon)
   - [Étape 1 — Scraping OpenTDB](#étape-1--scraping-opentdb)
@@ -119,8 +199,9 @@ Makefile                    orchestration : make all
 
 ### Pré-requis
 
-- **Python 3.13** (`brew install python@3.13`) — `dbt-core` ne supporte pas
-  encore 3.14. Adapter `PYTHON` dans le `Makefile` si besoin.
+- **Python 3.12 – 3.14** (vérifié en CI ; développé en 3.13). macOS : `brew install python@3.13` ;
+  Windows : python.org. Avec `make`, `PYTHON` vaut `python3.13` par défaut :
+  `make install PYTHON=python3` si cette commande n'existe pas.
 - **LM Studio** — https://lmstudio.ai
 - CLI `lms` : `npx lmstudio install-cli` (ou via l'app, onglet Developer).
 
@@ -129,7 +210,7 @@ Makefile                    orchestration : make all
 ```bash
 git clone <url> && cd trivial-pursuit-benchmark
 cp .env.example .env          # ajuster MODELS
-make install                  # venv + pip + dbt deps + hook pre-commit
+make install                  # venv + pip + hook pre-commit
 ```
 
 `make install` active le **hook pre-commit** versionné (`.githooks/`, via
@@ -149,9 +230,11 @@ lms server start              # sert l'API sur http://localhost:1234
 lms ls                        # copier les clés exactes dans .env (MODELS=...)
 ```
 
-> Choisir des modèles **petits et rapides** (2–3B). Budget : ~4 500 questions ×
-> 3 modèles × 3 prompts ≈ 40 k appels ≈ plusieurs heures → lancer `make enrich`
-> le soir. Noter la **quantization** (`Q4_K_M`…) pour `dim_model`.
+> Choisir des modèles **petits et rapides** (2–3B). Budget du run publié :
+> 1784 questions × 4 modèles × 3 prompts ≈ 21 400 appels, réalisés en deux passes
+> (plusieurs heures au total) → lancer `make enrich` le soir et empêcher la mise en
+> veille (`caffeinate` sous macOS ; réglage d'alimentation sous Windows). Noter la
+> **quantization** (`Q4_K_M`…) pour `dim_model`.
 
 ### Exécution
 
@@ -176,6 +259,8 @@ LM Studio expose aussi une API **OpenAI-compatible** sur
 et lire `response_time` au wall-clock.
 
 ### Dépannage réseau (proxy EFREI / Cato)
+
+> Sans objet pour l'évaluation : le CSV bronze est déjà livré, le scraping n'est pas à refaire.
 
 Le réseau EFREI passe par un proxy **Cato Networks** qui (a) inspecte le TLS et
 (b) **bloque `opentdb.com`** (catégorie « Games ») — HTTP 403 avec une page

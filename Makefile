@@ -1,5 +1,5 @@
 # Pipeline complet : make all
-# Python : dbt-core ne supporte pas encore 3.14 -> on cible 3.13.
+# Python : développé en 3.13 ; 3.12 à 3.14 vérifiés en CI. `make ... PYTHON=python3` si python3.13 est absent.
 PYTHON ?= python3.13
 VENV   := .venv
 PY     := $(VENV)/bin/python
@@ -52,6 +52,6 @@ dashboard: ## Étape 3b : dashboard Streamlit (lecture seule de gold)
 
 all: scrape clean-silver enrich build ## Pipeline complet (hors dashboard)
 
-clean-data: ## Supprime les données générées (bronze/silver/gold)
+clean-data: ## Supprime bronze/silver/gold, y compris les données LIVRÉES (`git checkout -- data` les restaure)
 	rm -rf data/bronze/* data/silver/* data/gold/*
 	@touch data/bronze/.gitkeep data/silver/.gitkeep data/gold/.gitkeep

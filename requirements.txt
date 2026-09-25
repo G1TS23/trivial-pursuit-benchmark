@@ -16,5 +16,5 @@ dbt-core>=1.9
 dbt-duckdb>=1.9
 
 # Dashboard
-streamlit>=1.39
+streamlit>=1.51        # width="stretch" (st.altair_chart/st.dataframe) : absent en 1.50, présent dès 1.51
 altair>=5.4

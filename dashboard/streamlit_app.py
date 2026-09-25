@@ -80,7 +80,7 @@ with tab1:
             .reset_index()
             .sort_values("precision", ascending=False))
     st.dataframe(lb.style.format({"precision": "{:.1%}", "exploitables": "{:.1%}",
-                                  "tps_median": "{:.2f} s"}), use_container_width=True)
+                                  "tps_median": "{:.2f} s"}), width="stretch")
 
     st.subheader("Précision vs latence (frontière de Pareto)")
     st.caption("Un point par (modèle, prompt) — regarde si les points se "
@@ -104,7 +104,7 @@ with tab1:
         detail="prompt_id:N",
     )
     st.altair_chart((points + labels).properties(height=420).interactive(),
-                    use_container_width=True)
+                    width="stretch")
 
 with tab2:
     by_cat = (f.groupby(["model", "category"]).ai_correct.mean().reset_index())
@@ -122,7 +122,7 @@ with tab2:
                             scale=alt.Scale(scheme="blues")),
             tooltip=["model", "category", alt.Tooltip("ai_correct", format=".1%")],
         ).properties(height=26 * n_cat + 40),
-        use_container_width=True,
+        width="stretch",
     )
 
 with tab3:
@@ -140,7 +140,7 @@ with tab3:
             tooltip=["model", "difficulty", alt.Tooltip("precision", format=".1%"),
                      alt.Tooltip("hasard", format=".1%")],
         ),
-        use_container_width=True,
+        width="stretch",
     )
     st.caption("À comparer au taux « au hasard » (1 / nombre d'options).")
 
@@ -158,10 +158,10 @@ with tab4:
             tooltip=["model", "prompt_id", alt.Tooltip("precision", format=".1%"),
                      alt.Tooltip("exploitables", format=".1%")],
         ),
-        use_container_width=True,
+        width="stretch",
     )
     st.dataframe(pi.style.format({"precision": "{:.1%}", "exploitables": "{:.1%}",
-                                 "longueur": "{:.0f}"}), use_container_width=True)
+                                 "longueur": "{:.0f}"}), width="stretch")
 
 with tab5:
     st.caption(
@@ -199,4 +199,4 @@ with tab5:
         errs = (err_pool[list(cols)]
                 .rename(columns=cols)
                 .sample(min(200, len(err_pool)), random_state=0))
-        st.dataframe(errs, use_container_width=True, height=500)
+        st.dataframe(errs, width="stretch", height=500)

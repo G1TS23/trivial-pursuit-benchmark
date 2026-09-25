@@ -371,7 +371,8 @@ pointues pour être vérifiées avec certitude (mème 4chan « 404 Girl », dét
 dialogue *Gravity Falls*) mais sans anomalie détectée. **0 erreur de matching.**
 Cohérent avec le mécanisme : `p2_format` compare une lettre unique issue d'une
 sortie JSON contrainte à la lettre pré-calculée en silver (0 incohérence
-lettre/option détectée sur les 5248 questions, cf. `clean_silver.py`) — pas de
+lettre/option sur les 5248 questions ; contrôle codé dans `clean_silver.py`, qui
+fait échouer la construction du silver au lieu d'écrire une donnée incohérente) — pas de
 place pour l'ambiguïté observée en mode `p1_naif` ci-dessus.
 
 **Conclusion méthodologique** : le score `p2_format` (64-68 % selon le modèle)

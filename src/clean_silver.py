@@ -51,7 +51,10 @@ def main() -> None:
     df = pl.read_csv(args.src)
 
     before = len(df)
-    df = df.unique(subset=["question_id"], keep="first")
+    # maintain_order=True : sans lui l'ordre des lignes varie d'un run à l'autre
+    # (polars ne le garantit pas), donc `--limit N` de enrich_lmstudio.py ne
+    # prendrait pas les mêmes N questions à chaque exécution.
+    df = df.unique(subset=["question_id"], keep="first", maintain_order=True)
     print(f"dédoublonnage : {before} -> {len(df)} lignes")
 
     incorrect = [json.loads(x) for x in df["incorrect_answers"].to_list()]
@@ -74,6 +77,20 @@ def main() -> None:
         pl.col("type").cast(pl.Categorical),
         pl.col("category").cast(pl.Categorical),
     )
+
+    # Garde-fou : la lettre attendue doit désigner la bonne réponse dans `options`.
+    # Sans lui, une régression du mélange déterministe fausserait silencieusement
+    # `ai_correct` pour tous les prompts QCM — le build échoue plutôt que d'écrire
+    # un silver incohérent. (Le README cite ce contrôle : 0 incohérence / 5248.)
+    bad = [
+        qid for qid, opts, letter, corr in zip(
+            out["question_id"], out["options"], out["correct_letter"], out["correct_answer"]
+        )
+        if opts[LETTERS.index(letter)] != corr
+    ]
+    if bad:
+        raise SystemExit(f"{len(bad)} question(s) avec correct_letter incohérent, ex. {bad[:3]}")
+    print(f"cohérence lettre/option : {len(out)}/{len(out)} OK")
 
     out.write_parquet(args.out)
     print(f"écrit : {args.out}  ({len(out)} questions)")

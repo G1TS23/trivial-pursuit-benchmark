@@ -1,2 +1,7 @@
 *.csv text eol=lf
 *.parquet binary
+# Fins de ligne LF forcées : un Makefile ou un hook en CRLF (checkout Windows avec
+# core.autocrlf=true) ne s'exécute plus (make, bash).
+Makefile text eol=lf
+.githooks/* text eol=lf
+*.sh text eol=lf

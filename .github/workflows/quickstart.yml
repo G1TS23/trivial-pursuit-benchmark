@@ -1,0 +1,63 @@
+# Rejoue le "démarrage rapide" du README (sans LM Studio) sur Windows, Linux et
+# macOS : la doc est testée, pas seulement écrite. Échoue si un test dbt échoue
+# ou si le dashboard ne se rend pas.
+name: quickstart
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PYTHONUTF8: "1"          # console Windows : évite les erreurs d'encodage
+
+jobs:
+  quickstart:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental || false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        python: ["3.13"]
+        include:
+          - {os: ubuntu-latest, python: "3.12"}
+          # Informatif : le README affirmait que dbt ne supporte pas 3.14.
+          - {os: ubuntu-latest, python: "3.14", experimental: true}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -r requirements.txt
+      - name: Construire le gold (dbt build, tests inclus)
+        working-directory: dbt
+        run: dbt build
+      - name: Smoke test du dashboard
+        run: python tests/smoke_dashboard.py
+      - name: Régénérer le silver des questions (contrôle d intégrité lettre/option)
+        run: python src/clean_silver.py
+
+  # Rejoue à l'identique les commandes PowerShell du README (venv + activation).
+  windows-readme:
+    name: Windows PowerShell (commandes du README)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Démarrage rapide, tel qu'écrit dans le README
+        shell: pwsh
+        run: |
+          $env:PYTHONUTF8 = "1"
+          py -3.13 -m venv .venv
+          .\.venv\Scripts\Activate.ps1
+          pip install -r requirements.txt
+          cd dbt
+          dbt build
+          cd ..
+          python tests/smoke_dashboard.py

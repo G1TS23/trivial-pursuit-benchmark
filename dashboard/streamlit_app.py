@@ -15,10 +15,37 @@ import altair as alt
 import duckdb
 import pandas as pd
 import streamlit as st
+from packaging.version import Version
 
 GOLD_DB = Path(__file__).resolve().parents[1] / "data" / "gold" / "gold.duckdb"
 
 st.set_page_config(page_title="Benchmark IA — Culture générale", layout="wide")
+
+# --- Compatibilité Streamlit : "pleine largeur" -------------------------------
+# `use_container_width` est déprécié (retiré après 2025-12-31) au profit de
+# `width="stretch"`, qui n'existe pas dans toutes les versions. Seuils MESURÉS
+# en installant chaque version (les notes de version se sont révélées
+# inexactes, et `"width" in signature` est trompeur : st.dataframe a toujours eu
+# un `width` entier, sans accepter "stretch") :
+#   st.dataframe(width="stretch")    : KO en 1.48.0, OK dès 1.49.0
+#   st.altair_chart(width="stretch") : paramètre absent en 1.50.0, OK dès 1.51.0
+_ST_VERSION = Version(st.__version__)
+STRETCH_DF = ({"width": "stretch"} if _ST_VERSION >= Version("1.49")
+              else {"use_container_width": True})
+STRETCH_CHART = ({"width": "stretch"} if _ST_VERSION >= Version("1.51")
+                 else {"use_container_width": True})
+
+# Plancher testé : le dashboard a été exécuté (streamlit AppTest) de 1.39 à la
+# version courante. En dessous, rien n'est garanti -> message explicite plutôt
+# qu'un TypeError obscur au milieu de la page.
+MIN_STREAMLIT = Version("1.39")
+if _ST_VERSION < MIN_STREAMLIT:
+    st.error(
+        f"Streamlit {st.__version__} détecté : ce dashboard est testé à partir de "
+        f"la version {MIN_STREAMLIT}. Mets à jour avec `pip install -U streamlit` "
+        "(ou relance `make install`)."
+    )
+    st.stop()
 
 
 @st.cache_resource
@@ -80,7 +107,7 @@ with tab1:
             .reset_index()
             .sort_values("precision", ascending=False))
     st.dataframe(lb.style.format({"precision": "{:.1%}", "exploitables": "{:.1%}",
-                                  "tps_median": "{:.2f} s"}), width="stretch")
+                                  "tps_median": "{:.2f} s"}), **STRETCH_DF)
 
     st.subheader("Précision vs latence (frontière de Pareto)")
     st.caption("Un point par (modèle, prompt) — regarde si les points se "
@@ -104,7 +131,7 @@ with tab1:
         detail="prompt_id:N",
     )
     st.altair_chart((points + labels).properties(height=420).interactive(),
-                    width="stretch")
+                    **STRETCH_CHART)
 
 with tab2:
     by_cat = (f.groupby(["model", "category"]).ai_correct.mean().reset_index())
@@ -122,7 +149,7 @@ with tab2:
                             scale=alt.Scale(scheme="blues")),
             tooltip=["model", "category", alt.Tooltip("ai_correct", format=".1%")],
         ).properties(height=26 * n_cat + 40),
-        width="stretch",
+        **STRETCH_CHART,
     )
 
 with tab3:
@@ -140,7 +167,7 @@ with tab3:
             tooltip=["model", "difficulty", alt.Tooltip("precision", format=".1%"),
                      alt.Tooltip("hasard", format=".1%")],
         ),
-        width="stretch",
+        **STRETCH_CHART,
     )
     st.caption("À comparer au taux « au hasard » (1 / nombre d'options).")
 
@@ -158,10 +185,10 @@ with tab4:
             tooltip=["model", "prompt_id", alt.Tooltip("precision", format=".1%"),
                      alt.Tooltip("exploitables", format=".1%")],
         ),
-        width="stretch",
+        **STRETCH_CHART,
     )
     st.dataframe(pi.style.format({"precision": "{:.1%}", "exploitables": "{:.1%}",
-                                 "longueur": "{:.0f}"}), width="stretch")
+                                 "longueur": "{:.0f}"}), **STRETCH_DF)
 
 with tab5:
     st.caption(
@@ -199,4 +226,4 @@ with tab5:
         errs = (err_pool[list(cols)]
                 .rename(columns=cols)
                 .sample(min(200, len(err_pool)), random_state=0))
-        st.dataframe(errs, width="stretch", height=500)
+        st.dataframe(errs, **STRETCH_DF, height=500)

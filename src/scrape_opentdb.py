@@ -161,6 +161,31 @@ def parse_row(raw: dict) -> dict:
     }
 
 
+def _ingest_batch(results: list[dict], seen: set[str], rows: list[dict],
+                   cap: int | None, pbar: tqdm | None) -> tuple[int, int, bool]:
+    """Ajoute les questions nouvelles de `results` à `rows`.
+
+    Retourne (nouvelles, doublons, cap_atteint).
+    """
+    got = 0
+    dup = 0
+    cap_reached = False
+    for raw in results:
+        row = parse_row(raw)
+        if row["question_id"] in seen:
+            dup += 1
+            continue
+        seen.add(row["question_id"])
+        rows.append(row)
+        got += 1
+        if pbar is not None:
+            pbar.update(1)
+        if cap and len(rows) >= cap:
+            cap_reached = True
+            break
+    return got, dup, cap_reached
+
+
 def collect(c: Client, token: str, category: int | None, seen: set[str],
             rows: list[dict], cap: int | None, pbar: tqdm | None = None) -> int:
     got = 0
@@ -174,19 +199,13 @@ def collect(c: Client, token: str, category: int | None, seen: set[str],
             continue
         if code == 2:
             raise RuntimeError(f"code 2 (paramètre invalide) — category={category}")
-        for raw in results:
-            row = parse_row(raw)
-            if row["question_id"] in seen:
-                dup += 1
-                continue
-            seen.add(row["question_id"])
-            rows.append(row)
-            got += 1
-            if pbar is not None:
-                pbar.update(1)
-                pbar.set_postfix({"doublons": dup})
-            if cap and len(rows) >= cap:
-                return got
+        batch_got, batch_dup, cap_reached = _ingest_batch(results, seen, rows, cap, pbar)
+        got += batch_got
+        dup += batch_dup
+        if pbar is not None:
+            pbar.set_postfix({"doublons": dup})
+        if cap_reached:
+            return got
 
 
 def main() -> None:

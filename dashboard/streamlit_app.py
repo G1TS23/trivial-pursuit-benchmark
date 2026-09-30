@@ -19,6 +19,10 @@ from packaging.version import Version
 
 GOLD_DB = Path(__file__).resolve().parents[1] / "data" / "gold" / "gold.duckdb"
 
+FIELD_MODEL = "model:N"
+FIELD_PROMPT_ID = "prompt_id:N"
+FIELD_PRECISION = "precision:Q"
+
 st.set_page_config(page_title="Benchmark IA — Culture générale", layout="wide")
 
 # --- Compatibilité Streamlit : "pleine largeur" -------------------------------
@@ -117,18 +121,18 @@ with tab1:
         # laisse presque tout le graphique vide vu que les points sont
         # regroupés dans une zone étroite (0,3-1,3 s / 35-68 %).
         x=alt.X("tps_median:Q", title="Temps médian (s)", scale=alt.Scale(zero=False)),
-        y=alt.Y("precision:Q", title="Précision", axis=alt.Axis(format="%"),
+        y=alt.Y(FIELD_PRECISION, title="Précision", axis=alt.Axis(format="%"),
                 scale=alt.Scale(zero=False)),
     )
     points = base.mark_point(size=260, filled=True, opacity=0.85).encode(
-        color=alt.Color("model:N", title="Modèle"),
-        shape=alt.Shape("prompt_id:N", title="Prompt"),
+        color=alt.Color(FIELD_MODEL, title="Modèle"),
+        shape=alt.Shape(FIELD_PROMPT_ID, title="Prompt"),
         tooltip=["model", "prompt_id", alt.Tooltip("precision", format=".1%"),
                  alt.Tooltip("tps_median", format=".2f"), alt.Tooltip("n", title="n questions")],
     )
     labels = base.mark_text(dy=-14, fontSize=10).encode(
-        text="model:N", color=alt.value("#666"),
-        detail="prompt_id:N",
+        text=FIELD_MODEL, color=alt.value("#666"),
+        detail=FIELD_PROMPT_ID,
     )
     st.altair_chart((points + labels).properties(height=420).interactive(),
                     **STRETCH_CHART)
@@ -144,7 +148,7 @@ with tab2:
                     sort=alt.EncodingSortField(field="ai_correct", op="mean", order="descending"),
                     # défaut Altair = 100px -> tronque "Entertainment: Japanese Anime & Manga"
                     axis=alt.Axis(labelLimit=280)),
-            x=alt.X("model:N", title=None, axis=alt.Axis(labelAngle=-30)),
+            x=alt.X(FIELD_MODEL, title=None, axis=alt.Axis(labelAngle=-30)),
             color=alt.Color("ai_correct:Q", title="Précision",
                             scale=alt.Scale(scheme="blues")),
             tooltip=["model", "category", alt.Tooltip("ai_correct", format=".1%")],
@@ -162,8 +166,8 @@ with tab3:
     st.altair_chart(
         alt.Chart(by_diff.sort_values("k")).mark_bar().encode(
             x=alt.X("difficulty:N", sort=["easy", "medium", "hard"], title=None),
-            y=alt.Y("precision:Q", axis=alt.Axis(format="%")),
-            color="model:N", xOffset="model:N",
+            y=alt.Y(FIELD_PRECISION, axis=alt.Axis(format="%")),
+            color=FIELD_MODEL, xOffset=FIELD_MODEL,
             tooltip=["model", "difficulty", alt.Tooltip("precision", format=".1%"),
                      alt.Tooltip("hasard", format=".1%")],
         ),
@@ -178,10 +182,10 @@ with tab4:
                  longueur=("answer_len", "mean")).reset_index())
     st.altair_chart(
         alt.Chart(pi).mark_bar().encode(
-            x=alt.X("prompt_id:N", title=None),
-            y=alt.Y("precision:Q", axis=alt.Axis(format="%")),
-            color="prompt_id:N", xOffset="model:N",
-            column=alt.Column("model:N", title=None),
+            x=alt.X(FIELD_PROMPT_ID, title=None),
+            y=alt.Y(FIELD_PRECISION, axis=alt.Axis(format="%")),
+            color=FIELD_PROMPT_ID, xOffset=FIELD_MODEL,
+            column=alt.Column(FIELD_MODEL, title=None),
             tooltip=["model", "prompt_id", alt.Tooltip("precision", format=".1%"),
                      alt.Tooltip("exploitables", format=".1%")],
         ),

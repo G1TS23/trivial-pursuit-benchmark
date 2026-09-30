@@ -70,7 +70,7 @@ def load_dotenv(path: Path | None = None) -> None:
             continue
         key, _, val = line.partition("=")
         val = val.strip()
-        if not (val.startswith('"') or val.startswith("'")) and " #" in val:
+        if not val.startswith(('"', "'")) and " #" in val:
             val = val.split(" #", 1)[0].strip()   # commentaire en fin de ligne
         os.environ.setdefault(key.strip(), val.strip('"').strip("'"))
 
